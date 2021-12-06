@@ -33,6 +33,7 @@ except ImportError:
 class Detect(nn.Module):
     stride = None  # strides computed during build
     onnx_dynamic = False  # ONNX export parameter
+    rknn_export = False  # rknn export
 
     def __init__(self, nc=80, anchors=(), ch=(), inplace=True):  # detection layer
         super().__init__()
@@ -49,7 +50,11 @@ class Detect(nn.Module):
     def forward(self, x):
         z = []  # inference output
         for i in range(self.nl):
+            # RKNN support
+            if self.rknn_export:
+                continue
             x[i] = self.m[i](x[i])  # conv
+
             bs, _, ny, nx = x[i].shape  # x(bs,255,20,20) to x(bs,3,20,20,85)
             x[i] = x[i].view(bs, self.na, self.no, ny, nx).permute(0, 1, 3, 4, 2).contiguous()
 

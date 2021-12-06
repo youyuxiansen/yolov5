@@ -362,6 +362,8 @@ def run(data=ROOT / 'data/coco128.yaml',  # 'dataset.yaml path'
             m.inplace = inplace
             m.onnx_dynamic = dynamic
             # m.forward = m.forward_export  # assign forward (optional)
+    # RKNN support
+    model.model[-1].rknn_export = True
 
     for _ in range(2):
         y = model(im)  # dry runs

@@ -24,7 +24,10 @@ try:
 
     assert hasattr(wandb, '__version__')  # verify package import not local dir
     if pkg.parse_version(wandb.__version__) >= pkg.parse_version('0.12.2') and RANK in [0, -1]:
-        wandb_login_success = wandb.login(timeout=30)
+        try:
+            wandb_login_success = wandb.login(timeout=30)
+        except wandb.errors.UsageError:  # known non-TTY terminal issue
+            wandb_login_success = False
         if not wandb_login_success:
             wandb = None
 except (ImportError, AssertionError):
@@ -131,11 +134,11 @@ class Loggers():
             if ((epoch + 1) % self.opt.save_period == 0 and not final_epoch) and self.opt.save_period != -1:
                 self.wandb.log_model(last.parent, self.opt, epoch, fi, best_model=best_fitness == fi)
 
-    def on_train_end(self, last, best, plots, epoch):
+    def on_train_end(self, last, best, plots, epoch, results):
         # Callback runs on training end
         if plots:
             plot_results(file=self.save_dir / 'results.csv')  # save results.png
-        files = ['results.png', 'confusion_matrix.png', *[f'{x}_curve.png' for x in ('F1', 'PR', 'P', 'R')]]
+        files = ['results.png', 'confusion_matrix.png', *(f'{x}_curve.png' for x in ('F1', 'PR', 'P', 'R'))]
         files = [(self.save_dir / f) for f in files if (self.save_dir / f).exists()]  # filter
 
         if self.tb:

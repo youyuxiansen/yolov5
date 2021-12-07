@@ -568,7 +568,8 @@ def main(opt, callbacks=Callbacks()):
         if opt.bucket:
             os.system(f'gsutil cp gs://{opt.bucket}/evolve.csv {save_dir}')  # download evolve.csv if exists
 
-        for _ in range(opt.evolve):  # generations to evolve
+        for i in range(opt.evolve):  # generations to evolve
+            print(colorstr('Evolve step: ' + i))
             if evolve_csv.exists():  # if evolve.csv exists: select best hyps and mutate
                 # Select parent(s)
                 parent = 'single'  # parent selection method: 'single' or 'weighted'

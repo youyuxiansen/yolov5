@@ -68,6 +68,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
     w = save_dir / 'weights'  # weights dir
     (w.parent if evolve else w).mkdir(parents=True, exist_ok=True)  # make dir
     last, best = w / 'last.pt', w / 'best.pt'
+    anchors_file = w / 'anchors.txt'
 
     # Hyperparameters
     if isinstance(hyp, str):
@@ -387,6 +388,14 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                 torch.save(ckpt, last)
                 if best_fitness == fi:
                     torch.save(ckpt, best)
+                    # save anchors.txt
+                    # Detect() layer
+                    m = model.module.model[-1] if hasattr(model, 'module') else model.model[-1]
+                    anchors_for_save = np.array(m.anchors.clone().view_as(
+                        m.anchors) * m.stride.to(m.anchors.device).view(-1, 1, 1).squeeze().cpu()).astype(int).reshape(m.nl, -1)  # nl:detect layer
+                    print(anchors_for_save)
+                    np.savetxt(anchors_file, anchors_for_save, '%d', ", ")
+
                 if (epoch > 0) and (opt.save_period > 0) and (epoch % opt.save_period == 0):
                     torch.save(ckpt, w / f'epoch{epoch}.pt')
                 del ckpt

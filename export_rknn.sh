@@ -1,6 +1,6 @@
 #!/bin/bash
 
-FILE=runs/train/exp/weights/yolov5s.pt
+FILE=runs/train/indoor/exp/weights/best.pt
 # Delete the character after the last slash.
 PATH=$PWD/${FILE%/*}
 # remove the suffix .pt

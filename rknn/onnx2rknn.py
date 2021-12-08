@@ -64,11 +64,11 @@ if __name__ == '__main__':
 
     # Export rknn model
     print('--> Export RKNN model')
-    rknn = opt.onnx_weights.with_suffix('.rknn')
-    assert rknn.exists(), f'failed to export rknn file cause it exists: {rknn}'
-    ret = rknn.export_rknn(rknn)
+    rknn_model_path = Path(opt.onnx_weights).with_suffix('.rknn')
+    assert not rknn_model_path.exists(), f'failed to export rknn file cause it exists: {rknn_model_path}'
+    ret = rknn.export_rknn(rknn_model_path)
     if ret != 0:
-        print('Export {} failed!'.format(rknn))
+        print('Export {} failed!'.format(rknn_model_path))
         exit(ret)
     print('done')
 

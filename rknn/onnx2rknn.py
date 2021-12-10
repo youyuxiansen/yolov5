@@ -56,7 +56,7 @@ if __name__ == '__main__':
 
     # Build model
     print('--> Building model')
-    ret = rknn.build(do_quantization=True, dataset='./rknn/dataset.txt')
+    ret = rknn.build(do_quantization=True, dataset=opt.DATASET, pre_compile=True)
     if ret != 0:
         print('Build model failed!')
         exit(ret)
@@ -65,19 +65,11 @@ if __name__ == '__main__':
     # Export rknn model
     print('--> Export RKNN model')
     rknn_model_path = Path(opt.onnx_weights).with_suffix('.rknn')
-    assert not rknn_model_path.exists(), f'failed to export rknn file cause it exists: {rknn_model_path}'
+    # assert not rknn_model_path.exists(), f'failed to export rknn file cause it exists: {rknn_model_path}'
     ret = rknn.export_rknn(rknn_model_path)
     if ret != 0:
         print('Export {} failed!'.format(rknn_model_path))
         exit(ret)
     print('done')
-
-    # ret = rknn.init_runtime(target='rv1109', rknn2precompile=True)
-    # if ret != 0:
-    #     print('Init runtime environment failed')
-    #     exit(ret)
-    # print('done')
-
-    # ret = rknn.export_rknn_precompile_model(RKNN_PRECOMPILED_MODEL)
 
     rknn.release()

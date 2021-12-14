@@ -391,8 +391,8 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                     # save anchors.txt
                     # Detect() layer
                     m = model.module.model[-1] if hasattr(model, 'module') else model.model[-1]
-                    anchors_for_save = np.array(m.anchors.clone().view_as(
-                        m.anchors) * m.stride.to(m.anchors.device).view(-1, 1, 1).squeeze().cpu()).astype(int).reshape(m.nl, -1)  # nl:detect layer
+                    anchors_for_save = np.array(
+                        m.anchors.clone().cpu() * m.stride.to(m.anchors.device).view(-1, 1, 1).cpu()).astype(int).reshape(m.nl, -1)  # nl:detect layer
                     print(anchors_for_save)
                     np.savetxt(anchors_file, anchors_for_save, '%d', ", ")
 

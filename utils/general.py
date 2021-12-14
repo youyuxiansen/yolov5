@@ -510,7 +510,7 @@ def labels_to_class_weights(labels, nc=80):
     # weights = np.hstack([gpi * len(labels)  - weights.sum() * 9, weights * 9]) ** 0.5  # prepend gridpoints to start
 
     weights[weights == 0] = 1  # replace empty bins with 1
-    weights = 1 / weights  # number of targets per class
+    weights = 1 / weights  # the smaller the number of class, the greater the weight.
     weights /= weights.sum()  # normalize
     return torch.from_numpy(weights)
 

@@ -253,3 +253,9 @@ com_crashlytics_export_strings.xml
 crashlytics.properties
 crashlytics-build.properties
 fabric.properties
+
+# some own ignored files
+data/hyps/hyp_evolved50_indoor.yaml
+data/hyps/hyp.finetune.amicro.robottracking.yaml
+data/robot_tracking.yaml
+data/indoor_amicro.yaml

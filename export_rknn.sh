@@ -1,6 +1,6 @@
 #! /bin/bash
 
-MODELFILE=runs/train/indoor/exp/weights/best.pt
+MODELFILE=runs/train/indoor/exp5/weights/best.pt
 # Delete the character after the last slash.
 JUSTPATH=$PWD/${MODELFILE%/*}
 # remove the suffix .pt

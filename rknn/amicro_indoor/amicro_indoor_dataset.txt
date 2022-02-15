@@ -1,4 +1,3 @@
-test_jpeg150.jpg
 000001.jpg
 000002.jpg
 000003.jpg

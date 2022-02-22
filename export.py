@@ -363,13 +363,12 @@ def run(data=ROOT / 'data/coco128.yaml',  # 'dataset.yaml path'
             m.onnx_dynamic = dynamic
             # m.forward = m.forward_export  # assign forward (optional)
 
-    for _ in range(2):
-        y = model(im)  # dry runs
-    LOGGER.info(f"\n{colorstr('PyTorch:')} starting from {file} ({file_size(file):.1f} MB)")
-
     # RKNN support
     model.model[-1].export = True  # set Detect() layer export=True
     model.model[-1].rknn_export = True  # set Detect() layer rknn_export=True
+    for _ in range(2):
+        y = model(im)  # dry runs
+    LOGGER.info(f"\n{colorstr('PyTorch:')} starting from {file} ({file_size(file):.1f} MB)")
 
     # Exports
     if 'torchscript' in include:

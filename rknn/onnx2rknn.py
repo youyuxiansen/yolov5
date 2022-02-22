@@ -67,7 +67,8 @@ if __name__ == '__main__':
     # pre-process config
     print('--> config model')
     rknn.config(mean_values=[[0, 0, 0]], std_values=[[255, 255, 255]],
-                reorder_channel='0 1 2', target_platform='rv1109', output_optimize=1)
+                reorder_channel='0 1 2', target_platform='rv1109',
+                output_optimize=1, quantized_dtype="dynamic_fixed_point-i8")
     print('done')
 
     print('--> Loading model')
@@ -79,7 +80,7 @@ if __name__ == '__main__':
 
     # Build model
     print('--> Building model')
-    ret = rknn.build(do_quantization=True, dataset=str(opt.DATASET), pre_compile=False, rknn_batch_size=128)
+    ret = rknn.build(do_quantization=True, dataset=str(opt.DATASET), pre_compile=True)
     if ret != 0:
         print('Build model failed!')
         exit(ret)

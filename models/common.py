@@ -307,8 +307,8 @@ class DetectMultiBackend(nn.Module):
         check_suffix(w, suffixes)  # check weights have acceptable suffix
         pt, jit, onnx, engine, tflite, pb, saved_model, coreml, rknn = (suffix == x for x in suffixes)  # backend booleans
         if onnx and rk_infer:
-            from rknn.rknn_python_inference.rknn_impl import RknnImpl
-            from rknn.rknn_python_inference.yolov5_detector_impl import AmicroIndoorYolov5Detector
+            from rknn_lib.rknn_python_inference.rknn_impl import RknnImpl
+            from rknn_lib.rknn_python_inference.yolov5_detector_impl import AmicroIndoorYolov5Detector
             onnx = False
             rknn = True
         stride, names = 64, [f'class{i}' for i in range(1000)]  # assign defaults

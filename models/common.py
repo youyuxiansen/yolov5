@@ -27,8 +27,6 @@ from utils.general import (LOGGER, check_requirements, check_suffix, colorstr, i
                            non_max_suppression, scale_coords, xywh2xyxy, xyxy2xywh)
 from utils.plots import Annotator, colors, save_one_box
 from utils.torch_utils import copy_attr, time_sync
-from rknn.rknn_python_inference.rknn_impl import RknnImpl
-from rknn.rknn_python_inference.yolov5_detector_impl import AmicroIndoorYolov5Detector
 
 def autopad(k, p=None):  # kernel, padding
     # Pad to 'same'
@@ -287,7 +285,7 @@ class Concat(nn.Module):
 
 class DetectMultiBackend(nn.Module):
     # YOLOv5 MultiBackend class for python inference on various backends
-    def __init__(self, weights='yolov5s.pt', device=None, dnn=False):
+    def __init__(self, weights='yolov5s.pt', device=None, dnn=False, rk_infer=False):
         # Usage:
         #   PyTorch:      weights = *.pt
         #   TorchScript:            *.torchscript
@@ -306,6 +304,11 @@ class DetectMultiBackend(nn.Module):
         suffixes = ['.pt', '.torchscript', '.onnx', '.engine', '.tflite', '.pb', '', '.mlmodel', '.rknn']
         check_suffix(w, suffixes)  # check weights have acceptable suffix
         pt, jit, onnx, engine, tflite, pb, saved_model, coreml, rknn = (suffix == x for x in suffixes)  # backend booleans
+        if onnx and rk_infer:
+            from rknn.rknn_python_inference.rknn_impl import RknnImpl
+            from rknn.rknn_python_inference.yolov5_detector_impl import AmicroIndoorYolov5Detector
+            onnx = False
+            rknn = True
         stride, names = 64, [f'class{i}' for i in range(1000)]  # assign defaults
         attempt_download(w)  # download if not local
 

@@ -1,5 +1,14 @@
 import datetime
+import os
 from pathlib import Path
+import sys
+
+FILE = Path(__file__).resolve()
+ROOT = FILE.parents[0]  # YOLOv5 root directory
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))  # add ROOT to PATH
+ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
+
 from detector_bridge import NN
 from rknn.api import RKNN
 

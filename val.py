@@ -108,6 +108,7 @@ def run(data,
         plots=True,
         callbacks=Callbacks(),
         compute_loss=None,
+        rk_infer=False
         ):
     # Initialize/load model and set device
     training = model is not None
@@ -124,7 +125,7 @@ def run(data,
         (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
 
         # Load model
-        model = DetectMultiBackend(weights, device=device, dnn=dnn)
+        model = DetectMultiBackend(weights, device=device, dnn=dnn, rk_infer=True)
         stride, pt, jit, engine = model.stride, model.pt, model.jit, model.engine
         imgsz = check_img_size(imgsz, s=stride)  # check image size
         half &= (pt or jit or engine) and device.type != 'cpu'  # half precision only supported by PyTorch on CUDA
@@ -326,7 +327,7 @@ def parse_opt():
     parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
     parser.add_argument('--half', action='store_true', help='use FP16 half-precision inference')
     parser.add_argument('--dnn', action='store_true', help='use OpenCV DNN for ONNX inference')
-    parser.add_argument('--rk-infer', action='store_true', help='use rknn for inference')
+    parser.add_argument('--rk_infer', action='store_true', help='use rknn for inference')
     opt = parser.parse_args()
     opt.data = check_yaml(opt.data)  # check YAML
     opt.save_json |= opt.data.endswith('coco.yaml')

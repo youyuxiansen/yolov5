@@ -1,4 +1,4 @@
-from detector_bridge import Detector
+from rknn_lib.rknn_python_inference.detector_bridge import Detector
 import cv2
 import numpy as np
 import random

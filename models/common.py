@@ -27,6 +27,8 @@ from utils.general import (LOGGER, check_requirements, check_suffix, colorstr, i
                            non_max_suppression, scale_coords, xywh2xyxy, xyxy2xywh)
 from utils.plots import Annotator, colors, save_one_box
 from utils.torch_utils import copy_attr, time_sync
+from rknn_lib.rknn_python_inference.rknn_impl import RknnImpl
+from rknn_lib.rknn_python_inference.yolov5_detector_impl import AmicroIndoorYolov5Detector
 
 def autopad(k, p=None):  # kernel, padding
     # Pad to 'same'

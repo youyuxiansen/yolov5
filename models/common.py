@@ -10,6 +10,8 @@ import warnings
 from collections import OrderedDict, namedtuple
 from copy import copy
 from pathlib import Path
+import sys
+import os
 
 import cv2
 import numpy as np
@@ -25,7 +27,8 @@ from utils.general import (LOGGER, check_requirements, check_suffix, colorstr, i
                            non_max_suppression, scale_coords, xywh2xyxy, xyxy2xywh)
 from utils.plots import Annotator, colors, save_one_box
 from utils.torch_utils import copy_attr, time_sync
-
+from rknn.rknn_python_inference.rknn_impl import RknnImpl
+from rknn.rknn_python_inference.yolov5_detector_impl import AmicroIndoorYolov5Detector
 
 def autopad(k, p=None):  # kernel, padding
     # Pad to 'same'
@@ -300,9 +303,9 @@ class DetectMultiBackend(nn.Module):
         super().__init__()
         w = str(weights[0] if isinstance(weights, list) else weights)
         suffix = Path(w).suffix.lower()
-        suffixes = ['.pt', '.torchscript', '.onnx', '.engine', '.tflite', '.pb', '', '.mlmodel']
+        suffixes = ['.pt', '.torchscript', '.onnx', '.engine', '.tflite', '.pb', '', '.mlmodel', '.rknn']
         check_suffix(w, suffixes)  # check weights have acceptable suffix
-        pt, jit, onnx, engine, tflite, pb, saved_model, coreml = (suffix == x for x in suffixes)  # backend booleans
+        pt, jit, onnx, engine, tflite, pb, saved_model, coreml, rknn = (suffix == x for x in suffixes)  # backend booleans
         stride, names = 64, [f'class{i}' for i in range(1000)]  # assign defaults
         attempt_download(w)  # download if not local
 
@@ -350,6 +353,12 @@ class DetectMultiBackend(nn.Module):
             binding_addrs = OrderedDict((n, d.ptr) for n, d in bindings.items())
             context = model.create_execution_context()
             batch_size = bindings['images'].shape[0]
+        elif rknn:
+            LOGGER.info(f'Loading {w} for rknn inference...')
+            PARAMS = {"mean_values": [[0.] * 3], "std_values": [[255.0] * 3], "reorder_channel": '0 1 2'}
+            nn = RknnImpl(**PARAMS)
+            model = AmicroIndoorYolov5Detector(nn)
+            model.init(w)
         else:  # TensorFlow model (TFLite, pb, saved_model)
             if pb:  # https://www.tensorflow.org/guide/migrate#a_graphpb_or_graphpbtxt
                 LOGGER.info(f'Loading {w} for TensorFlow *.pb inference...')
@@ -410,6 +419,10 @@ class DetectMultiBackend(nn.Module):
             self.binding_addrs['images'] = int(im.data_ptr())
             self.context.execute_v2(list(self.binding_addrs.values()))
             y = self.bindings['output'].data
+        elif self.rknn:
+            y = self.model(im) if self.jit else self.model(im, augment=augment, visualize=visualize)
+            self.model.detect_suit_yolo(im)
+            return (y, []) if val else y[0]
         else:  # TensorFlow model (TFLite, pb, saved_model)
             im = im.permute(0, 2, 3, 1).cpu().numpy()  # torch BCHW to numpy BHWC shape(1,320,192,3)
             if self.pb:

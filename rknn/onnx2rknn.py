@@ -6,6 +6,7 @@ import random
 import shutil
 import sys
 import numpy as np
+import datetime
 import yaml
 from rknn.api import RKNN
 
@@ -68,7 +69,7 @@ if __name__ == '__main__':
     print('--> config model')
     rknn.config(mean_values=[[0, 0, 0]], std_values=[[255, 255, 255]],
                 reorder_channel='0 1 2', target_platform='rv1109',
-                output_optimize=1, quantized_dtype="dynamic_fixed_point-i8")
+                output_optimize=1)
     print('done')
 
     print('--> Loading model')
@@ -88,7 +89,9 @@ if __name__ == '__main__':
 
     # Export rknn model
     print('--> Export RKNN model')
-    rknn_model_path = Path(opt.onnx_weights).with_suffix('.rknn')
+    nowTime = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
+    onnx_filename_with_time = str(Path(opt.onnx_weights).stem) + '_' + str(nowTime)
+    rknn_model_path = Path(opt.onnx_weights).parent / Path(onnx_filename_with_time).with_suffix('.rknn')
     # assert not rknn_model_path.exists(), f'failed to export rknn file cause it exists: {rknn_model_path}'
     ret = rknn.export_rknn(rknn_model_path)
     if ret != 0:

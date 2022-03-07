@@ -172,13 +172,15 @@ def run(data,
             im = im.to(device, non_blocking=True)
             targets = targets.to(device)
         im = im.half() if half else im.float()  # uint8 to fp16/32
-        im /= 255  # 0 - 255 to 0.0 - 1.0
+        if not rk_infer:
+            im /= 255  # 0 - 255 to 0.0 - 1.0
         nb, _, height, width = im.shape  # batch size, channels, height, width
         t2 = time_sync()
         dt[0] += t2 - t1
 
         # Inference
         out, train_out = model(im) if training else model(im, augment=augment, val=True)  # inference, loss outputs
+        out = torch.tensor(out)
         dt[1] += time_sync() - t2
 
         # Loss
@@ -188,9 +190,12 @@ def run(data,
         # NMS
         targets[:, 2:] *= torch.Tensor([width, height, width, height]).to(device)  # to pixels
         lb = [targets[targets[:, 0] == i, 1:] for i in range(nb)] if save_hybrid else []  # for autolabelling
-        t3 = time_sync()
-        out = non_max_suppression(out, conf_thres, iou_thres, labels=lb, multi_label=True, agnostic=single_cls)
-        dt[2] += time_sync() - t3
+        if not rk_infer:
+            t3 = time_sync()
+            out = non_max_suppression(out, conf_thres, iou_thres, labels=lb, multi_label=True, agnostic=single_cls)
+            dt[2] += time_sync() - t3
+        else:
+            out = [out] # to keep the dim the same as after nms
 
         # Metrics
         for si, pred in enumerate(out):

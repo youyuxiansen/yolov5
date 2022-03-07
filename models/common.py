@@ -27,8 +27,6 @@ from utils.general import (LOGGER, check_requirements, check_suffix, colorstr, i
                            non_max_suppression, scale_coords, xywh2xyxy, xyxy2xywh)
 from utils.plots import Annotator, colors, save_one_box
 from utils.torch_utils import copy_attr, time_sync
-from rknn_lib.rknn_python_inference.rknn_impl import RknnImpl
-from rknn_lib.rknn_python_inference.yolov5_detector_impl import AmicroIndoorYolov5Detector
 
 def autopad(k, p=None):  # kernel, padding
     # Pad to 'same'
@@ -306,7 +304,7 @@ class DetectMultiBackend(nn.Module):
         suffixes = ['.pt', '.torchscript', '.onnx', '.engine', '.tflite', '.pb', '', '.mlmodel', '.rknn']
         check_suffix(w, suffixes)  # check weights have acceptable suffix
         pt, jit, onnx, engine, tflite, pb, saved_model, coreml, rknn = (suffix == x for x in suffixes)  # backend booleans
-        if onnx and rk_infer:
+        if rk_infer: # force to go to the rknn branch
             from rknn_lib.rknn_python_inference.rknn_impl import RknnImpl
             from rknn_lib.rknn_python_inference.yolov5_detector_impl import AmicroIndoorYolov5Detector
             onnx = False
@@ -425,8 +423,10 @@ class DetectMultiBackend(nn.Module):
             self.context.execute_v2(list(self.binding_addrs.values()))
             y = self.bindings['output'].data
         elif self.rknn:
-            y = self.model(im) if self.jit else self.model(im, augment=augment, visualize=visualize)
-            self.model.detect_suit_yolo(im)
+            # y = self.model(im) if self.jit else self.model(im, augment=augment, visualize=visualize)
+            # torch BCHW to numpy HWC shape (640, 640, 3)
+            im = im.permute(2, 3, 1, 0).squeeze().cpu().numpy()
+            y = self.model.detect_suit_yolo(im)
             return (y, []) if val else y[0]
         else:  # TensorFlow model (TFLite, pb, saved_model)
             im = im.permute(0, 2, 3, 1).cpu().numpy()  # torch BCHW to numpy BHWC shape(1,320,192,3)

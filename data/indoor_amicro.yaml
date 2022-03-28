@@ -1,8 +1,8 @@
 download: bash data/scripts/get_voc_indoor_detect.sh
 
 # train and val data as 1) directory: path/images/, 2) file: path/images.txt, or 3) list: [path1/images/, path2/images/]
-train: /home/felix/data/YOLOs/indoor_detecting/VOC/images/train/
-val: /home/felix/data/YOLOs/indoor_detecting/VOC/images/val/
+train: /home/yousixia/data/YOLOs/indoor_detecting/VOC/images/train/
+val: /home/yousixia/data/YOLOs/indoor_detecting/VOC/images/val/
 
 # number of classes
 nc: 16

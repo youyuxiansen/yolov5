@@ -2,7 +2,7 @@ import datetime
 from pathlib import Path
 import sys
 from rknn.api import RKNN
-from rknn_lib.rknn_python_inference.detector_bridge import NN
+from detector_bridge import NN
 
 # 接收onnx类型的RKNN
 
@@ -48,6 +48,7 @@ class RknnImpl(NN):
         # 初始化RKNN运行环境
         print('--> Init runtime environment')
         # ret = rknn.init_runtime(host='rk3399pro')
+        # Don't need specifying device id if only one device connected
         ret = rknn.init_runtime('RV1126')
         return rknn
 

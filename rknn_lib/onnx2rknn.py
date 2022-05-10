@@ -81,7 +81,7 @@ if __name__ == '__main__':
 
     # Build model
     print('--> Building model')
-    ret = rknn.build(do_quantization=False, pre_compile=True)
+    ret = rknn.build(do_quantization=False, pre_compile=False)
     if ret != 0:
         print('Build model failed!')
         exit(ret)

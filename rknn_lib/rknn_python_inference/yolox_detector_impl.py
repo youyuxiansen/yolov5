@@ -1,4 +1,3 @@
-from rknn_lib.rknn_python_inference.detector_bridge import Detector
 import cv2
 import numpy as np
 import random
@@ -6,6 +5,9 @@ import torch
 import sys
 import os
 from pathlib import Path
+from torchvision.ops import nms, boxes
+
+from detector_bridge import Detector
 
 
 def get_max_scale(img, max_w, max_h):
@@ -228,6 +230,8 @@ amicro indoor yolov5
 
 class AmicroIndoorYoloxDetector(BaseYOLOXDetector):
     """直接覆盖父类的属性，可以修改默认的锚点和iou值等"""
+    _conf_thresh = 0.5
+    _iou_thresh = 0.3
     _names = ["trashcan", "slippers", "wire", "socks", "carpet", "book",
               "feces", "curtain", "stool", "bed", "sofa", "closestool", "table",
               "cabinet", "ajardoor", "opendoor", "closedoor", "stairway"]
@@ -243,25 +247,25 @@ class AmicroIndoorYoloxDetector(BaseYOLOXDetector):
         print("OriginYolov5Detector -> _showResult")
         cv2.imwrite("../runs/rknn-detect/1.jpg", result)
 
-    def xywh2xyxy(self, x):
-        # Convert [x, y, w, h] to [x1, y1, x2, y2]
-        y = np.copy(x)
-        y[:, 0] = x[:, 0] - x[:, 2] / 2  # top left x
-        y[:, 1] = x[:, 1] - x[:, 3] / 2  # top left y
-        y[:, 2] = x[:, 0] + x[:, 2] / 2  # bottom right x
-        y[:, 3] = x[:, 1] + x[:, 3] / 2  # bottom right y
-        return y
+    # def xywh2xyxy(self, x):
+    #     # Convert [center_x, center_y, w, h] to left-top,right-bottom
+    #     y = np.copy(x)
+    #     y[:, 0] = x[:, 0] - x[:, 2] / 2  # top left x
+    #     y[:, 1] = x[:, 1] - x[:, 3] / 2  # top left y
+    #     y[:, 2] = x[:, 0] + x[:, 2] / 2  # bottom right x
+    #     y[:, 3] = x[:, 1] + x[:, 3] / 2  # bottom right y
+    #     return y
 
-    def __filter_boxes(self, boxes, box_confidences, box_class_probs, conf_thres):
-        box_scores = box_confidences * box_class_probs  # 条件概率， 在该cell存在物体的概率的基础上是某个类别的概率
-        box_classes = np.argmax(box_scores, axis=-1)  # 找出概率最大的类别索引
-        box_class_scores = np.max(box_scores, axis=-1)  # 最大类别对应的概率值
-        pos = np.where(box_class_scores >= conf_thres)  # 找出概率大于阈值的item
-        # pos = box_class_scores >= OBJ_THRESH  # 找出概率大于阈值的item
-        boxes = boxes[pos]
-        classes = box_classes[pos]
-        scores = box_class_scores[pos]
-        return boxes, classes, scores
+    # def __filter_boxes(self, boxes, box_confidences, box_class_probs, conf_thres):
+    #     box_scores = box_confidences * box_class_probs  # 条件概率， 在该cell存在物体的概率的基础上是某个类别的概率
+    #     box_classes = np.argmax(box_scores, axis=-1)  # 找出概率最大的类别索引
+    #     box_class_scores = np.max(box_scores, axis=-1)  # 最大类别对应的概率值
+    #     pos = np.where(box_class_scores >= conf_thres)  # 找出概率大于阈值的item
+    #     # pos = box_class_scores >= OBJ_THRESH  # 找出概率大于阈值的item
+    #     boxes = boxes[pos]
+    #     classes = box_classes[pos]
+    #     scores = box_class_scores[pos]
+    #     return boxes, classes, scores
 
     def draw(self, image, boxes, scores, classes):
         """Draw the boxes on the image.
@@ -274,22 +278,26 @@ class AmicroIndoorYoloxDetector(BaseYOLOXDetector):
             all_classes: all classes name.
         """
         for box, score, cl in zip(boxes, scores, classes):
-            top, left, right, bottom = box
-            print('class: {}, score: {}'.format(self._names[cl], score))
-            print('box coordinate left,top,right,down: [{}, {}, {}, {}]'.format(top, left, right, bottom))
-            top = int(top)
-            left = int(left)
-            right = int(right)
-            bottom = int(bottom)
+            y1, x1, y2, x2 = box
 
-            cv2.rectangle(image, (top, left), (right, bottom), (255, 0, 0), 2)
+            print('class: {}, score: {}'.format(self._names[cl], score))
+            x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+            print('box coordinate x1, y1, x2, y2: [{}, {}, {}, {}]'.format(x1, y1, x2, y2))
+
+            cv2.rectangle(image, (x1, y1), (x2, y2), (255, 0, 0), 2)
             cv2.putText(image, '{0} {1:.2f}'.format(self._names[cl], score),
-                        (top, left - 6),
+                        (x1, y1 - 6),
                         cv2.FONT_HERSHEY_SIMPLEX,
                         0.6, (0, 0, 255), 2)
+        return image
 
     def detect_suit_yolo(self, img):
-        result = self._nn.inference([img])
+        if isinstance(img, str):
+            img = cv2.imread(img)
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            self.image_origin_shape = np.array(np.shape(img)[0:2])
+        new_img, _ = self._preInference(img, self._wh)
+        result = self._nn.inference([new_img])
         if not result:
             print("Inference result is NULL")
             return []
@@ -297,63 +305,61 @@ class AmicroIndoorYoloxDetector(BaseYOLOXDetector):
         if scores is None:
             return []
         output = np.concatenate((boxes, np.expand_dims(scores, axis=1), np.expand_dims(classes, axis=1)), axis=1)
-        import cv2
         img_1 = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         if boxes is not None:
-            self.draw(img_1, boxes, scores, classes)
+            img_1 = self.draw(img_1, boxes, scores, classes)
         cv2.imwrite("asd.jpg", img_1)
         return output
 
-    def process(self, input, mask, anchors):
+    # def process(self, input):
 
-        anchors = [anchors[i] for i in mask]
-        grid_h, grid_w = map(int, input.shape[0:2])
+    #     grid_h, grid_w = map(int, input.shape[0:2])
 
-        box_confidence = sigmoid(input[..., 4])
-        box_confidence = np.expand_dims(box_confidence, axis=-1)
+    #     box_confidence = sigmoid(input[..., 4])
+    #     box_confidence = np.expand_dims(box_confidence, axis=-1)
 
-        box_class_probs = sigmoid(input[..., 5:])
+    #     box_class_probs = sigmoid(input[..., 5:])
 
-        box_xy = sigmoid(input[..., :2]) * 2 - 0.5
+    #     box_xy = sigmoid(input[..., :2]) * 2 - 0.5
 
-        col = np.tile(np.arange(0, grid_w), grid_w).reshape(-1, grid_w)
-        row = np.tile(np.arange(0, grid_h).reshape(-1, 1), grid_h)
-        col = col.reshape(grid_h, grid_w, 1, 1).repeat(3, axis=-2)
-        row = row.reshape(grid_h, grid_w, 1, 1).repeat(3, axis=-2)
-        grid = np.concatenate((col, row), axis=-1)
-        box_xy += grid
-        box_xy *= int(self._wh[1] / grid_h)
+    #     col = np.tile(np.arange(0, grid_w), grid_w).reshape(-1, grid_w)
+    #     row = np.tile(np.arange(0, grid_h).reshape(-1, 1), grid_h)
+    #     col = col.reshape(grid_h, grid_w, 1, 1).repeat(3, axis=-2)
+    #     row = row.reshape(grid_h, grid_w, 1, 1).repeat(3, axis=-2)
+    #     grid = np.concatenate((col, row), axis=-1)
+    #     box_xy += grid
+    #     box_xy *= int(self._wh[1] / grid_h)
 
-        box_wh = pow(sigmoid(input[..., 2:4]) * 2, 2)
-        box_wh = box_wh * anchors
+    #     box_wh = pow(sigmoid(input[..., 2:4]) * 2, 2)
+    #     box_wh = box_wh * anchors
 
-        box = np.concatenate((box_xy, box_wh), axis=-1)
+    #     box = np.concatenate((box_xy, box_wh), axis=-1)
 
-        return box, box_confidence, box_class_probs
+    #     return box, box_confidence, box_class_probs
 
-    def filter_boxes(self, boxes, box_confidences, box_class_probs):
-        """Filter boxes with object threshold.
+    # def filter_boxes(self, boxes, box_confidences, box_class_probs):
+    #     """Filter boxes with object threshold.
 
-        # Arguments
-            boxes: ndarray, boxes of objects.
-            box_confidences: ndarray, confidences of objects.
-            box_class_probs: ndarray, class_probs of objects.
+    #     # Arguments
+    #         boxes: ndarray, boxes of objects.
+    #         box_confidences: ndarray, confidences of objects.
+    #         box_class_probs: ndarray, class_probs of objects.
 
-        # Returns
-            boxes: ndarray, filtered boxes.
-            classes: ndarray, classes for boxes.
-            scores: ndarray, scores for boxes.
-        """
-        box_scores = box_confidences * box_class_probs
-        box_classes = np.argmax(box_scores, axis=-1)
-        box_class_scores = np.max(box_scores, axis=-1)
-        pos = np.where(box_class_scores >= self._conf_thresh)
+    #     # Returns
+    #         boxes: ndarray, filtered boxes.
+    #         classes: ndarray, classes for boxes.
+    #         scores: ndarray, scores for boxes.
+    #     """
+    #     box_scores = box_confidences * box_class_probs
+    #     box_classes = np.argmax(box_scores, axis=-1)
+    #     box_class_scores = np.max(box_scores, axis=-1)
+    #     pos = np.where(box_class_scores >= self._conf_thresh)
 
-        boxes = boxes[pos]
-        classes = box_classes[pos]
-        scores = box_class_scores[pos]
+    #     boxes = boxes[pos]
+    #     classes = box_classes[pos]
+    #     scores = box_class_scores[pos]
 
-        return boxes, classes, scores
+    #     return boxes, classes, scores
 
     def nms_boxes(self, boxes, scores):
         """Suppress non-maximal boxes.
@@ -393,19 +399,198 @@ class AmicroIndoorYoloxDetector(BaseYOLOXDetector):
         keep = np.array(keep)
         return keep
 
+    def yolo_correct_boxes(self, box_xy, box_wh, input_shape, image_shape, letterbox_image):
+        #-----------------------------------------------------------------#
+        #   把y轴放前面是因为方便预测框和图像的宽高进行相乘
+        #-----------------------------------------------------------------#
+        box_yx = box_xy[..., ::-1]
+        box_hw = box_wh[..., ::-1]
+        input_shape = np.array(input_shape)
+        image_shape = np.array(image_shape)
+
+        if letterbox_image:
+            #-----------------------------------------------------------------#
+            #   这里求出来的offset是图像有效区域相对于图像左上角的偏移情况
+            #   new_shape指的是宽高缩放情况
+            #-----------------------------------------------------------------#
+            new_shape = np.round(image_shape * np.min(input_shape / image_shape))
+            # offset = (input_shape - new_shape) / 2. / input_shape
+            scale = input_shape / new_shape
+
+            # box_yx = (box_yx - offset) * scale # 注释这里是因为没有采用
+            box_yx = (box_yx) * scale
+            box_hw *= scale
+
+        box_mins = box_yx - (box_hw / 2.)
+        box_maxes = box_yx + (box_hw / 2.)
+        boxes = np.concatenate([box_mins[..., 0:1], box_mins[..., 1:2],
+                               box_maxes[..., 0:1], box_maxes[..., 1:2]], axis=-1)
+        boxes *= np.concatenate([image_shape, image_shape], axis=-1)
+        return boxes
+
+    def decode_outputs(self, outputs):
+        grids = []
+        strides = []
+        outputs = [torch.tensor(x) for x in outputs]
+        hw = [x.shape[-2:] for x in outputs]
+        #---------------------------------------------------#
+        #   outputs输入前代表每个特征层的预测结果
+        #   batch_size, 4 + 1 + num_classes, 80, 80 => batch_size, 4 + 1 + num_classes, 6400
+        #   batch_size, 5 + num_classes, 40, 40
+        #   batch_size, 5 + num_classes, 20, 20
+        #   batch_size, 4 + 1 + num_classes, 6400 + 1600 + 400 -> batch_size, 4 + 1 + num_classes, 8400
+        #   堆叠后为batch_size, 8400, 5 + num_classes
+        #---------------------------------------------------#
+        outputs = torch.cat([x.flatten(start_dim=2) for x in outputs], dim=2).permute(0, 2, 1)
+        #---------------------------------------------------#
+        #   获得每一个特征点属于每一个种类的概率
+        #---------------------------------------------------#
+        outputs[:, :, 4:] = torch.sigmoid(outputs[:, :, 4:])
+        for h, w in hw:
+            #---------------------------#
+            #   根据特征层的高宽生成网格点
+            #---------------------------#
+            grid_y, grid_x = torch.meshgrid([torch.arange(h), torch.arange(w)])
+            #---------------------------#
+            #   1, 6400, 2
+            #   1, 1600, 2
+            #   1, 400, 2
+            #---------------------------#
+            grid = torch.stack((grid_x, grid_y), 2).view(1, -1, 2)
+            shape = grid.shape[:2]
+
+            grids.append(grid)
+            strides.append(torch.full((shape[0], shape[1], 1), self._wh[0] / h))
+        #---------------------------#
+        #   将网格点堆叠到一起
+        #   1, 6400, 2
+        #   1, 1600, 2
+        #   1, 400, 2
+        #
+        #   1, 8400, 2
+        #---------------------------#
+        grids = torch.cat(grids, dim=1).type(outputs.type())
+        strides = torch.cat(strides, dim=1).type(outputs.type())
+        #------------------------#
+        #   根据网格点进行解码
+        #------------------------#
+        outputs[..., :2] = (outputs[..., :2] + grids) * strides
+        outputs[..., 2:4] = torch.exp(outputs[..., 2:4]) * strides
+        #-----------------#
+        #   归一化
+        #-----------------#
+        outputs[..., [0, 2]] = outputs[..., [0, 2]] / self._wh[1]
+        outputs[..., [1, 3]] = outputs[..., [1, 3]] / self._wh[0]
+        return outputs
+
+    def non_max_suppression(self, prediction, num_classes, input_shape,
+        image_shape, letterbox_image, conf_thres=0.5, nms_thres=0.4):
+        #----------------------------------------------------------#
+        #   将预测结果的格式转换成左上角右下角的格式。
+        #   prediction  [batch_size, num_anchors, 85]
+        #----------------------------------------------------------#
+        box_corner = prediction.new(prediction.shape)
+        box_corner[:, :, 0] = prediction[:, :, 0] - prediction[:, :, 2] / 2
+        box_corner[:, :, 1] = prediction[:, :, 1] - prediction[:, :, 3] / 2
+        box_corner[:, :, 2] = prediction[:, :, 0] + prediction[:, :, 2] / 2
+        box_corner[:, :, 3] = prediction[:, :, 1] + prediction[:, :, 3] / 2
+        prediction[:, :, :4] = box_corner[:, :, :4]
+
+        output = [None for _ in range(len(prediction))]
+        #----------------------------------------------------------#
+        #   对输入图片进行循环，一般只会进行一次
+        #----------------------------------------------------------#
+        for i, image_pred in enumerate(prediction):
+            #----------------------------------------------------------#
+            #   对种类预测部分取max。
+            #   class_conf  [num_anchors, 1]    种类置信度
+            #   class_pred  [num_anchors, 1]    种类
+            #----------------------------------------------------------#
+            class_conf, class_pred = torch.max(image_pred[:, 5:5 + num_classes], 1, keepdim=True)
+
+            #----------------------------------------------------------#
+            #   利用置信度进行第一轮筛选
+            #----------------------------------------------------------#
+            conf_mask = (image_pred[:, 4] * class_conf[:, 0] >= conf_thres).squeeze()
+
+            if not image_pred.size(0):
+                continue
+            #-------------------------------------------------------------------------#
+            #   detections  [num_anchors, 7]
+            #   7的内容为：x1, y1, x2, y2, obj_conf, class_conf, class_pred
+            #-------------------------------------------------------------------------#
+            detections = torch.cat((image_pred[:, :5], class_conf, class_pred.float()), 1)
+            detections = detections[conf_mask]
+
+            nms_out_index = boxes.batched_nms(
+                detections[:, :4],
+                detections[:, 4] * detections[:, 5],
+                detections[:, 6],
+                nms_thres,
+            )
+
+            output[i] = detections[nms_out_index]
+
+            # #------------------------------------------#
+            # #   获得预测结果中包含的所有种类
+            # #------------------------------------------#
+            # unique_labels = detections[:, -1].cpu().unique()
+
+            # if prediction.is_cuda:
+            #     unique_labels = unique_labels.cuda()
+            #     detections = detections.cuda()
+
+            # for c in unique_labels:
+            #     #------------------------------------------#
+            #     #   获得某一类得分筛选后全部的预测结果
+            #     #------------------------------------------#
+            #     detections_class = detections[detections[:, -1] == c]
+
+            #     #------------------------------------------#
+            #     #   使用官方自带的非极大抑制会速度更快一些！
+            #     #------------------------------------------#
+            #     keep = nms(
+            #         detections_class[:, :4],
+            #         detections_class[:, 4] * detections_class[:, 5],
+            #         nms_thres
+            #     )
+            #     max_detections = detections_class[keep]
+
+            #     # # 按照存在物体的置信度排序
+            #     # _, conf_sort_index = torch.sort(detections_class[:, 4]*detections_class[:, 5], descending=True)
+            #     # detections_class = detections_class[conf_sort_index]
+            #     # # 进行非极大抑制
+            #     # max_detections = []
+            #     # while detections_class.size(0):
+            #     #     # 取出这一类置信度最高的，一步一步往下判断，判断重合程度是否大于nms_thres，如果是则去除掉
+            #     #     max_detections.append(detections_class[0].unsqueeze(0))
+            #     #     if len(detections_class) == 1:
+            #     #         break
+            #     #     ious = bbox_iou(max_detections[-1], detections_class[1:])
+            #     #     detections_class = detections_class[1:][ious < nms_thres]
+            #     # # 堆叠
+            #     # max_detections = torch.cat(max_detections).data
+
+            #     # Add max detections to outputs
+            #     output[i] = max_detections if output[i] is None else torch.cat((output[i], max_detections))
+
+            if output[i] is not None:
+                output[i] = output[i].cpu().numpy()
+                box_xy, box_wh = (output[i][:, 0:2] + output[i][:, 2:4]) / 2, output[i][:, 2:4] - output[i][:, 0:2]
+                output[i][:, :4] = self.yolo_correct_boxes(
+                    box_xy, box_wh, input_shape, image_shape, letterbox_image)
+        return output
+
     def yolov5_post_process_full(self, input_data):
         boxes, classes, scores = [], [], []
-        for input, mask in zip(input_data, self._masks):
-            b, c, s = self.process(input, mask, self._anchors)
-            b, c, s = self.filter_boxes(b, c, s)
-            boxes.append(b)
-            classes.append(c)
-            scores.append(s)
-
-        boxes = np.concatenate(boxes)
-        boxes = self.xywh2xyxy(boxes)
-        classes = np.concatenate(classes)
-        scores = np.concatenate(scores)
+        outputs = self.decode_outputs(input_data)
+        results = self.non_max_suppression(outputs, self.nc,
+                                           self._wh, self.image_origin_shape,
+                                           True, conf_thres=self._conf_thresh,
+                                           nms_thres=self._iou_thresh)
+        classes = np.array(results[0][:, 6], dtype='int32')
+        scores = results[0][:, 4] * results[0][:, 5]
+        boxes = results[0][:, :4]
 
         nboxes, nclasses, nscores = [], [], []
         for c in set(classes):
@@ -429,41 +614,41 @@ class AmicroIndoorYoloxDetector(BaseYOLOXDetector):
 
         return boxes, classes, scores
 
-    def yolov5_post_process_for_cal_MAP(self, input_data):
-        boxes, classes, scores = [], [], []
-        for input, mask in zip(input_data, self._masks):
-            b, c, s = self.process(input, mask, self._anchors)
-            b, c, s = self.filter_boxes(b, c, s)
-            boxes.append(b)
-            classes.append(c)
-            scores.append(s)
+    # def yolov5_post_process_for_cal_MAP(self, input_data):
+    #     boxes, classes, scores = [], [], []
+    #     for input, mask in zip(input_data, self._masks):
+    #         b, c, s = self.process(input, mask, self._anchors)
+    #         b, c, s = self.filter_boxes(b, c, s)
+    #         boxes.append(b)
+    #         classes.append(c)
+    #         scores.append(s)
 
-        boxes = np.concatenate(boxes)
-        boxes = self.xywh2xyxy(boxes)
-        classes = np.concatenate(classes)
-        scores = np.concatenate(scores)
+    #     boxes = np.concatenate(boxes)
+    #     boxes = self.xywh2xyxy(boxes)
+    #     classes = np.concatenate(classes)
+    #     scores = np.concatenate(scores)
 
-        nboxes, nclasses, nscores = [], [], []
-        for c in set(classes):
-            inds = np.where(classes == c)
-            b = boxes[inds]
-            c = classes[inds]
-            s = scores[inds]
+    #     nboxes, nclasses, nscores = [], [], []
+    #     for c in set(classes):
+    #         inds = np.where(classes == c)
+    #         b = boxes[inds]
+    #         c = classes[inds]
+    #         s = scores[inds]
 
-            keep = self.nms_boxes(b, s)
+    #         keep = self.nms_boxes(b, s)
 
-            nboxes.append(b[keep])
-            nclasses.append(c[keep])
-            nscores.append(s[keep])
+    #         nboxes.append(b[keep])
+    #         nclasses.append(c[keep])
+    #         nscores.append(s[keep])
 
-        if not nclasses and not nscores:
-            return None, None, None
+    #     if not nclasses and not nscores:
+    #         return None, None, None
 
-        boxes = np.concatenate(nboxes)
-        classes = np.concatenate(nclasses)
-        scores = np.concatenate(nscores)
+    #     boxes = np.concatenate(nboxes)
+    #     classes = np.concatenate(nclasses)
+    #     scores = np.concatenate(nscores)
 
-        return boxes, classes, scores
+    #     return boxes, classes, scores
 
     def _calMapPostprocess(self, result):
         print("BaseYOLOv5Detector -> _afterInference result: ", len(result[0]), len(
@@ -471,19 +656,10 @@ class AmicroIndoorYoloxDetector(BaseYOLOXDetector):
 
         boxes, classes, scores = [], [], []
 
-        bs, _, ny, nx = result[0].shape  # x(bs,255,80,80) to x(bs,3,80,80,85)
-        input0_data = torch.tensor(result[0]).view(bs, self.na, self.no, ny, nx).permute(0, 1, 3, 4, 2).cpu().numpy()
-        bs, _, ny, nx = result[1].shape  # x(bs,255,40,40) to x(bs,3,40,40,85)
-        input1_data = torch.tensor(result[1]).view(bs, self.na, self.no, ny, nx).permute(0, 1, 3, 4, 2).cpu().numpy()
-        bs, _, ny, nx = result[2].shape  # x(bs,255,20,20) to x(bs,3,20,20,85)
-        input2_data = torch.tensor(result[2]).view(bs, self.na, self.no, ny, nx).permute(0, 1, 3, 4, 2).cpu().numpy()
-        input0_data = input0_data.reshape(*input0_data.shape[1:])
-        input1_data = input1_data.reshape(*input1_data.shape[1:])
-        input2_data = input2_data.reshape(*input2_data.shape[1:])
         input_data = list()
-        input_data.append(np.transpose(input0_data, (1, 2, 0, 3)))
-        input_data.append(np.transpose(input1_data, (1, 2, 0, 3)))
-        input_data.append(np.transpose(input2_data, (1, 2, 0, 3)))
+        input_data.append(result[0])
+        input_data.append(result[1])
+        input_data.append(result[2])
         boxes, classes, scores = self.yolov5_post_process_full(input_data)
 
         print("AmicroYOLOv5Detector -> detect finished!")

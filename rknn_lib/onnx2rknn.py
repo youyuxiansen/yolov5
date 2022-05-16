@@ -44,23 +44,23 @@ if __name__ == '__main__':
     # DATASET = './rknn/dataset.txt'
 
     opt = parse_opt()
-    # if opt.DATASET is None:
-    #     # Read opt.yaml
-    #     with open(Path(opt.onnx_weights).parents[1] / "opt.yaml", errors='ignore') as f:
-    #         model_training_opt = yaml.safe_load(f)  # dictionary
-    #     with open(ROOT / model_training_opt['data'], errors='ignore') as f:
-    #         data = yaml.safe_load(f) # dictionary
-    #     data_path = data['train']
-    #     # ramdom sampling 5000 images to create DATASET.txt
-    #     all_imgs = random.sample(os.listdir(data_path), 5000)
-    #     opt.DATASET = Path(opt.onnx_weights).parents[1] / "dataset.txt"
-    #     if os.path.isfile(opt.DATASET):
-    #         print("DATASET exists in model path, directly use it!\n")
-    #     else:
-    #         f = open(opt.DATASET, "w")
-    #         for img in all_imgs:
-    #             f.write(str(Path(data_path) / img) + "\n")
-    #         f.close()
+    if opt.DATASET is None:
+        # Read opt.yaml
+        with open(Path(opt.onnx_weights).parents[1] / "opt.yaml", errors='ignore') as f:
+            model_training_opt = yaml.safe_load(f)  # dictionary
+        with open(ROOT / model_training_opt['data'], errors='ignore') as f:
+            data = yaml.safe_load(f) # dictionary
+        data_path = data['train']
+        # ramdom sampling 5000 images to create DATASET.txt
+        all_imgs = random.sample(os.listdir(data_path), 9000)
+        opt.DATASET = Path(opt.onnx_weights).parents[1] / "dataset.txt"
+        if os.path.isfile(opt.DATASET):
+            print("DATASET exists in model path, directly use it!\n")
+        else:
+            f = open(opt.DATASET, "w")
+            for img in all_imgs:
+                f.write(str(Path(data_path) / img) + "\n")
+            f.close()
 
     # Create RKNN object
     rknn = RKNN(verbose=True)
@@ -81,7 +81,7 @@ if __name__ == '__main__':
 
     # Build model
     print('--> Building model')
-    ret = rknn.build(do_quantization=False, pre_compile=True)
+    ret = rknn.build(do_quantization=True, pre_compile=False, dataset=str(opt.DATASET))
     if ret != 0:
         print('Build model failed!')
         exit(ret)

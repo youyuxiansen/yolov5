@@ -1,13 +1,13 @@
 download: bash data/scripts/get_voc_indoor_detect.sh
 
 # train and val data as 1) directory: path/images/, 2) file: path/images.txt, or 3) list: [path1/images/, path2/images/]
-train: /home/yousixia/data/YOLOs/indoor_detecting/VOC/images/train/
-val: /home/yousixia/data/YOLOs/indoor_detecting/VOC/images/val/
+train: /data/yousixia/YOLOs/indoor_detecting_18class/VOC/images/train/
+val: /data/yousixia/YOLOs/indoor_detecting_18class/VOC/images/val/
 
 # number of classes
-nc: 16
+nc: 18
 
 # class names
-names: [ 'feces', 'slippers', 'closetool', 'cabinet', 'curtain',
-         'trashcan', 'stool', 'table', 'bed', 'book', 'socks',
-         'sofa', 'carpet', 'wire', 'Door', 'Charger' ]
+names: ["trashcan", "slippers", "wire", "socks", "carpet", "book",
+        "feces", "curtain", "stool", "bed", "sofa", "closetool", "table",
+        "cabinet", "ajardoor", "opendoor", "closedoor", "stairway"]

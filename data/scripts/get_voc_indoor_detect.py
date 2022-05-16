@@ -8,12 +8,15 @@ from multiprocessing.pool import ThreadPool
 
 from tqdm import tqdm
 
-src_dir = "VOCs/indoor_detecting"  # directory structure must the same as VOC
-dest_dir = "YOLOs/indoor_detecting"
-classes = ['feces', 'slippers', 'closetool', 'cabinet', 'curtain',
-           'trashcan', 'stool', 'table', 'bed', 'book', 'socks',
-           'sofa', 'carpet', 'wire', 'Door', 'Charger']
-root = "/home/yousixia/data/"
+src_dir = "VOCs/indoor_detecting_18class"  # directory structure must the same as VOC
+dest_dir = "YOLOs/indoor_detecting_18class"
+# classes = ['feces', 'slippers', 'closetool', 'cabinet', 'curtain',
+#            'trashcan', 'stool', 'table', 'bed', 'book', 'socks',
+#            'sofa', 'carpet', 'wire', 'Door', 'Charger']
+classes = ["trashcan", "slippers", "wire", "socks", "carpet", "book",
+           "feces", "curtain", "stool", "bed", "sofa", "closetool", "table",
+           "cabinet", "ajardoor", "opendoor", "closedoor", "stairway"]
+root = "/data/yousixia/"
 sets = ['train', 'val', 'test']
 
 

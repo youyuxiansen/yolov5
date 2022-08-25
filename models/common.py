@@ -285,7 +285,7 @@ class Concat(nn.Module):
 
 class DetectMultiBackend(nn.Module):
     # YOLOv5 MultiBackend class for python inference on various backends
-    def __init__(self, weights='yolov5s.pt', device=None, dnn=False, rk_infer=False):
+    def __init__(self, weights='yolov5s.pt', device=None, dnn=False, rk_infer=False, model_type='yolo'):
         # Usage:
         #   PyTorch:      weights = *.pt
         #   TorchScript:            *.torchscript
@@ -307,6 +307,7 @@ class DetectMultiBackend(nn.Module):
         if rk_infer: # force to go to the rknn branch
             from rknn_lib.rknn_python_inference.rknn_impl import RknnImpl
             from rknn_lib.rknn_python_inference.yolov5_detector_impl import AmicroIndoorYolov5Detector
+            from rknn_lib.rknn_python_inference.yolox_detector_impl import AmicroIndoorYoloxDetector
             onnx = False
             rknn = True
         stride, names = 64, [f'class{i}' for i in range(1000)]  # assign defaults
@@ -360,8 +361,12 @@ class DetectMultiBackend(nn.Module):
             LOGGER.info(f'Loading {w} for rknn inference...')
             PARAMS = {"mean_values": [[0.] * 3], "std_values": [[255.0] * 3], "reorder_channel": '0 1 2'}
             nn = RknnImpl(**PARAMS)
-            model = AmicroIndoorYolov5Detector(nn)
+            if model_type == 'yolo':
+                model = AmicroIndoorYolov5Detector(nn)
+            elif model_type == 'yolox':
+                model = AmicroIndoorYoloxDetector(nn)
             model.init(w)
+            names = model._names
         else:  # TensorFlow model (TFLite, pb, saved_model)
             if pb:  # https://www.tensorflow.org/guide/migrate#a_graphpb_or_graphpbtxt
                 LOGGER.info(f'Loading {w} for TensorFlow *.pb inference...')

@@ -6,8 +6,7 @@ import sys
 import os
 from pathlib import Path
 from torchvision.ops import nms, boxes
-
-from detector_bridge import Detector
+from rknn_lib.rknn_python_inference.detector_bridge import Detector
 
 
 def get_max_scale(img, max_w, max_h):
@@ -233,7 +232,7 @@ class AmicroIndoorYoloxDetector(BaseYOLOXDetector):
     _conf_thresh = 0.5
     _iou_thresh = 0.3
     _names = ["trashcan", "slippers", "wire", "socks", "carpet", "book",
-              "feces", "curtain", "stool", "bed", "sofa", "closestool", "table",
+              "feces", "curtain", "stool", "bed", "sofa", "closetool", "table",
               "cabinet", "ajardoor", "opendoor", "closedoor", "stairway"]
     nc = len(_names)
     no = nc + 5  # number of outputs per anchor
@@ -278,7 +277,7 @@ class AmicroIndoorYoloxDetector(BaseYOLOXDetector):
             all_classes: all classes name.
         """
         for box, score, cl in zip(boxes, scores, classes):
-            y1, x1, y2, x2 = box
+            x1, y1, x2, y2 = box
 
             print('class: {}, score: {}'.format(self._names[cl], score))
             x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
@@ -291,75 +290,61 @@ class AmicroIndoorYoloxDetector(BaseYOLOXDetector):
                         0.6, (0, 0, 255), 2)
         return image
 
+    def letterbox(self, im, new_shape=(640, 640), color=(0, 0, 0)):
+        # Resize and pad image while meeting stride-multiple constraints
+        shape = im.shape[:2]  # current shape [height, width]
+        if isinstance(new_shape, int):
+            new_shape = (new_shape, new_shape)
+
+        # Scale ratio (new / old)
+        r = min(new_shape[0] / shape[0], new_shape[1] / shape[1])
+
+        # Compute padding
+        ratio = r, r  # width, height ratios
+        new_unpad = int(round(shape[1] * r)), int(round(shape[0] * r))
+        dw, dh = new_shape[1] - new_unpad[0], new_shape[0] - new_unpad[1]  # wh padding
+
+        dw /= 2  # divide padding into 2 sides
+        dh /= 2
+
+        if shape[::-1] != new_unpad:  # resize
+            im = cv2.resize(im, new_unpad, interpolation=cv2.INTER_LINEAR)
+        top, bottom = int(round(dh - 0.1)), int(round(dh + 0.1))
+        left, right = int(round(dw - 0.1)), int(round(dw + 0.1))
+        im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
+        return im, ratio, (dw, dh)
+
     def detect_suit_yolo(self, img):
         if isinstance(img, str):
             img = cv2.imread(img)
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            self.image_origin_shape = np.array(np.shape(img)[0:2])
-        new_img, _ = self._preInference(img, self._wh)
-        result = self._nn.inference([new_img])
+        self.image_origin_shape = np.array(np.shape(img)[0:2])
+        img_1, _, _ = self.letterbox(img, new_shape=self._wh)
+        img_1 = cv2.cvtColor(img_1, cv2.COLOR_BGR2RGB)
+        # new_img, _ = self._preInference(img, self._wh)
+        cv2.imwrite("img_1.jpg", img_1)
+        result = self._nn.inference([img_1])
         if not result:
             print("Inference result is NULL")
             return []
         boxes, scores, classes = self._calMapPostprocess(result)
         if scores is None:
             return []
+
+        # output = np.array([[296, 464, 392, 498, 0.95, 6],
+        #                    [80, 59, 473, 318, 0.95, 8]])
+        # output = output[:, [1, 0, 3, 2, 4, 5]]
+        # boxes = output[:, :4]
+        # scores = output[:, 4]
+        # classes = output[:, 5].astype(int)
+        boxes = boxes[:, [1, 0, 3, 2]]
         output = np.concatenate((boxes, np.expand_dims(scores, axis=1), np.expand_dims(classes, axis=1)), axis=1)
-        img_1 = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+
+        # img_1 = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         if boxes is not None:
-            img_1 = self.draw(img_1, boxes, scores, classes)
-        cv2.imwrite("asd.jpg", img_1)
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            img_2 = self.draw(img, boxes, scores, classes)
+        cv2.imwrite("img_2.jpg", img_2)
         return output
-
-    # def process(self, input):
-
-    #     grid_h, grid_w = map(int, input.shape[0:2])
-
-    #     box_confidence = sigmoid(input[..., 4])
-    #     box_confidence = np.expand_dims(box_confidence, axis=-1)
-
-    #     box_class_probs = sigmoid(input[..., 5:])
-
-    #     box_xy = sigmoid(input[..., :2]) * 2 - 0.5
-
-    #     col = np.tile(np.arange(0, grid_w), grid_w).reshape(-1, grid_w)
-    #     row = np.tile(np.arange(0, grid_h).reshape(-1, 1), grid_h)
-    #     col = col.reshape(grid_h, grid_w, 1, 1).repeat(3, axis=-2)
-    #     row = row.reshape(grid_h, grid_w, 1, 1).repeat(3, axis=-2)
-    #     grid = np.concatenate((col, row), axis=-1)
-    #     box_xy += grid
-    #     box_xy *= int(self._wh[1] / grid_h)
-
-    #     box_wh = pow(sigmoid(input[..., 2:4]) * 2, 2)
-    #     box_wh = box_wh * anchors
-
-    #     box = np.concatenate((box_xy, box_wh), axis=-1)
-
-    #     return box, box_confidence, box_class_probs
-
-    # def filter_boxes(self, boxes, box_confidences, box_class_probs):
-    #     """Filter boxes with object threshold.
-
-    #     # Arguments
-    #         boxes: ndarray, boxes of objects.
-    #         box_confidences: ndarray, confidences of objects.
-    #         box_class_probs: ndarray, class_probs of objects.
-
-    #     # Returns
-    #         boxes: ndarray, filtered boxes.
-    #         classes: ndarray, classes for boxes.
-    #         scores: ndarray, scores for boxes.
-    #     """
-    #     box_scores = box_confidences * box_class_probs
-    #     box_classes = np.argmax(box_scores, axis=-1)
-    #     box_class_scores = np.max(box_scores, axis=-1)
-    #     pos = np.where(box_class_scores >= self._conf_thresh)
-
-    #     boxes = boxes[pos]
-    #     classes = box_classes[pos]
-    #     scores = box_class_scores[pos]
-
-    #     return boxes, classes, scores
 
     def nms_boxes(self, boxes, scores):
         """Suppress non-maximal boxes.
@@ -414,11 +399,11 @@ class AmicroIndoorYoloxDetector(BaseYOLOXDetector):
             #   new_shape指的是宽高缩放情况
             #-----------------------------------------------------------------#
             new_shape = np.round(image_shape * np.min(input_shape / image_shape))
-            # offset = (input_shape - new_shape) / 2. / input_shape
+            offset = (input_shape - new_shape) / 2. / input_shape
             scale = input_shape / new_shape
 
-            # box_yx = (box_yx - offset) * scale # 注释这里是因为没有采用
-            box_yx = (box_yx) * scale
+            box_yx = (box_yx - offset) * scale
+            # box_yx = (box_yx) * scale
             box_hw *= scale
 
         box_mins = box_yx - (box_hw / 2.)
@@ -484,7 +469,7 @@ class AmicroIndoorYoloxDetector(BaseYOLOXDetector):
         return outputs
 
     def non_max_suppression(self, prediction, num_classes, input_shape,
-        image_shape, letterbox_image, conf_thres=0.5, nms_thres=0.4):
+                            image_shape, letterbox_image, conf_thres=0.5, nms_thres=0.4):
         #----------------------------------------------------------#
         #   将预测结果的格式转换成左上角右下角的格式。
         #   prediction  [batch_size, num_anchors, 85]

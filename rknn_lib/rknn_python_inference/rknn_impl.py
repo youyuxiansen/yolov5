@@ -1,8 +1,9 @@
 import datetime
+import os
 from pathlib import Path
 import sys
 from rknn.api import RKNN
-from detector_bridge import NN
+from rknn_lib.rknn_python_inference.detector_bridge import NN
 
 # 接收onnx类型的RKNN
 

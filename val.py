@@ -109,7 +109,7 @@ def run(data,
         plots=True,
         callbacks=Callbacks(),
         compute_loss=None,
-        rk_infer=False,
+        inference_type='yolo',
         model_type='yolo'
         ):
     # Initialize/load model and set device
@@ -127,7 +127,7 @@ def run(data,
         (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
 
         # Load model
-        model = DetectMultiBackend(weights, device=device, dnn=dnn, rk_infer=True, model_type=model_type)
+        model = DetectMultiBackend(weights, device=device, dnn=dnn, inference_type=inference_type, model_type=model_type)
         stride, pt, jit, engine = model.stride, model.pt, model.jit, model.engine
         imgsz = check_img_size(imgsz, s=stride)  # check image size
         half &= (pt or jit or engine) and device.type != 'cpu'  # half precision only supported by PyTorch on CUDA
@@ -174,30 +174,33 @@ def run(data,
             im = im.to(device, non_blocking=True)
             targets = targets.to(device)
         im = im.half() if half else im.float()  # uint8 to fp16/32
-        if not rk_infer:
+        if inference_type == 'yolo':
             im /= 255  # 0 - 255 to 0.0 - 1.0
         nb, _, height, width = im.shape  # batch size, channels, height, width
         t2 = time_sync()
         dt[0] += t2 - t1
 
         # Inference
-        out, train_out = model(im) if training else model(im, augment=augment, val=True)  # inference, loss outputs
-        out = torch.tensor(out)
-        dt[1] += time_sync() - t2
-
-        # Loss
-        if compute_loss:
-            loss += compute_loss([x.float() for x in train_out], targets)[1]  # box, obj, cls
-
-        # NMS
+        out, train_out = model(im) if training else model(im, augment=augment, val=True, im_path=paths)  # inference, loss outputs
         targets[:, 2:] *= torch.Tensor([width, height, width, height]).to(device)  # to pixels
         lb = [targets[targets[:, 0] == i, 1:] for i in range(nb)] if save_hybrid else []  # for autolabelling
-        if not rk_infer:
+        dt[1] += time_sync() - t2
+        if inference_type != 'am_quanzhi':
+            out = torch.tensor(out)
+
+            # Loss
+            if compute_loss:
+                loss += compute_loss([x.float() for x in train_out], targets)[1]  # box, obj, cls
+
             t3 = time_sync()
-            out = non_max_suppression(out, conf_thres, iou_thres, labels=lb, multi_label=True, agnostic=single_cls)
+            if inference_type == 'yolo':
+                # NMS
+                out = non_max_suppression(out, conf_thres, iou_thres, labels=lb, multi_label=True, agnostic=single_cls)
+            else:
+                out = [out] # to keep the dim the same as after nms
             dt[2] += time_sync() - t3
         else:
-            out = [out] # to keep the dim the same as after nms
+            dt[2] += 0
 
         # Metrics
         for si, pred in enumerate(out):
@@ -216,12 +219,17 @@ def run(data,
             if single_cls:
                 pred[:, 5] = 0
             predn = pred.clone()
+            if inference_type == 'am_quanzhi':
+                # keep pred the same
+                shape = im[si].shape[1:]
             scale_coords(im[si].shape[1:], predn[:, :4], shape, shapes[si][1])  # native-space pred
 
             # Evaluate
             if nl:
+                if inference_type == 'am_quanzhi':
+                    shape = [1280, 720]
                 tbox = xywh2xyxy(labels[:, 1:5])  # target boxes
-                scale_coords(im[si].shape[1:], tbox, shape, shapes[si][1])  # native-space labels
+                scale_coords(im[si].shape[1:], tbox, shape, None)  # native-space labels
                 labelsn = torch.cat((labels[:, 0:1], tbox), 1)  # native-space labels
                 correct = process_batch(predn, labelsn, iouv)
                 if plots:
@@ -314,9 +322,10 @@ def run(data,
 def parse_opt():
     parser = argparse.ArgumentParser()
     parser.add_argument('--data', type=str, default=ROOT / 'data/coco128.yaml', help='dataset.yaml path')
-    parser.add_argument('--weights', nargs='+', type=str, default=ROOT / 'yolov5s.pt', help='model.pt path(s)')
+    parser.add_argument('--weights', type=str, default=ROOT / 'yolov5s.pt', help='model.pt path(s) (when in am_quanzhi mode, this represents folder that includes the recoginfo.txt file)')
     parser.add_argument('--batch-size', type=int, default=32, help='batch size')
-    parser.add_argument('--imgsz', '--img', '--img-size', type=int, default=640, help='inference size (pixels)')
+    parser.add_argument('--imgsz', '--img', '--img-size', nargs='+',
+                        type=int, default=640, help='inference size (pixels)')
     parser.add_argument('--conf-thres', type=float, default=0.001, help='confidence threshold')
     parser.add_argument('--iou-thres', type=float, default=0.6, help='NMS IoU threshold')
     parser.add_argument('--task', default='val', help='train, val, test, speed or study')
@@ -334,8 +343,9 @@ def parse_opt():
     parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
     parser.add_argument('--half', action='store_true', help='use FP16 half-precision inference')
     parser.add_argument('--dnn', action='store_true', help='use OpenCV DNN for ONNX inference')
-    parser.add_argument('--rk_infer', action='store_true', help='use rknn for inference')
-    parser.add_argument('--model_type', type=str, default='yolo', help='model type: could be yolo or yolox')
+    parser.add_argument('--inference_type', type=str, default='yolo', choices=['yolo', 'rknn', 'am_quanzhi'], help='inference type: must in [\'yolo\', \'rknn\', \'am_quanzhi\']')
+    parser.add_argument('--model_type', type=str, default='yolo',
+                        choices=['yolo', 'yolox'], help='model type: must in [\'yolo\', \'yolox\']')
     opt = parser.parse_args()
     opt.data = check_yaml(opt.data)  # check YAML
     opt.save_json |= opt.data.endswith('coco.yaml')

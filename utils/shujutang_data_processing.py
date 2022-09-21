@@ -7,13 +7,17 @@ from pathlib import Path
 import platform
 import threading
 from multiprocessing import Process
+import xml.etree.ElementTree as ET
 import time
 from tqdm import tqdm
+import cv2
 
 import argparse
 import pandas as pd
+import numpy as np
 from sklearn.model_selection import train_test_split
 from data_analysis import get_name_from_xml
+
 
 
 def construct_amicro_img_dir(saved_path, labelme_path, has_hard_sample: bool):
@@ -81,30 +85,14 @@ def construct_amicro_img_dir(saved_path, labelme_path, has_hard_sample: bool):
 
 
 if __name__ == '__main__':
-    # --data-root /home/yousixia/data/images --images-folder-name indoor_detecting --target-folder-path /home/yousixia/data/VOCs/indoor_detecting
+    # --data-root /home/yousixia/data/images
     parser = argparse.ArgumentParser(
         description='This program create '
                     'the directory structure like VOC and used to train yolo model')
     parser.add_argument('--data-root', "-r", type=str, default='/home/yousixia/data/images',
                         help='Directory for saving frame images')
-    parser.add_argument('--images-folder-name', "-n", type=str,
-                        help='Directory names including images and annatations, '
-                             'Multiple folder names, separated by commas。（e.q. labelme_20210520,labelme）')
-    parser.add_argument('--target-folder-path', "-p", type=str,
-                        help='Specifying forder names saving processed training data, '
-                             'it should locates under "/home/yousixia/data/VOCs"（e.q. /home/yousixia/data/VOCs/VOC2007_amicro）')
-    parser.add_argument('--has-hard-sample', "-hard", default=True, action='store_false',
-                        help="Include the images in folder which don't have correlated xml files")
-    parser.add_argument('--test', "-t", default=True, action='store_false',
-                        help="Test this script, no data destruction.")
-    parser.add_argument('--test_directory', "-td", type=str,
-                        help='Specifying forder names saving test data, will copy part of data to test this script. If \'--test\' is false, this won\'t work.')
-    # parser.add_argument('--label-path', nargs='+', type=str, help='Directory containing xml labels')
     opt = parser.parse_args()
     opt.data_root = Path(opt.data_root).as_posix()
-
-    if os.path.isdir(opt.target_folder_path):
-        raise Exception('target-folder-path: "{}" existed, please remove it manually first.'.format(opt.target_folder_path))
 
     base_path = Path(opt.data_root)
     all_files = [pathlib_object for pathlib_object in base_path.rglob("*") if pathlib_object.suffix in ['.jpg', '.png', '.xml']]
@@ -118,21 +106,20 @@ if __name__ == '__main__':
     all_img_str_files = [str(x) for x in all_img_files]
     # all_img_stem_files = set(all_img_stem_files)
 
-
     # 提取重复文件到txt中，反馈给数据堂
-    # def write_rep_filepath_to_txt(all_stem_files, all_str_files, output_filename):
-    #     f = open(output_filename + ".txt", "w")
-    #     save_dict = {}
-    #     rep_str_filepath = []
-    #     for i, x in enumerate(tqdm(all_stem_files)):
-    #         if x not in save_dict:
-    #             save_dict[x] = 1
-    #         elif save_dict[x] == 1:
-    #             save_dict[x] += 1
-    #         elif save_dict[x] > 1:
-    #             f.write(all_str_files[i] + '\n')
-    #             rep_str_filepath.append(all_str_files[i])
-    #     f.close()
+    def write_rep_filepath_to_txt(all_stem_files, all_str_files, output_filename):
+        f = open(output_filename + ".txt", "w")
+        save_dict = {}
+        rep_str_filepath = []
+        for i, x in enumerate(tqdm(all_stem_files)):
+            if x not in save_dict:
+                save_dict[x] = 1
+            elif save_dict[x] == 1:
+                save_dict[x] += 1
+            elif save_dict[x] > 1:
+                f.write(all_str_files[i] + '\n')
+                rep_str_filepath.append(all_str_files[i])
+        f.close()
     # img_p = Process(target=write_rep_filepath_to_txt, args=(
     #     all_img_stem_files, all_img_str_files, "img_rep_filepath", ))
     # xml_p = Process(target=write_rep_filepath_to_txt, args=(
@@ -142,26 +129,77 @@ if __name__ == '__main__':
     # img_p.join()
     # xml_p.join()
 
+
     # 移动遗漏标注的图片到另一个文件夹
-    # not_labeled_stem = list(set(all_xml_stem_files) ^ set(all_img_stem_files))
-    # all_not_labeled_img_files = [x for x in all_img_files if x.stem in not_labeled_stem]
-    # for x in all_not_labeled_img_files:
-    #     shutil.move(str(x), "/data/yousixia/images/shujutang_data/购买数据/遗漏标注图片")
-    # 复制所有已标注xml和jpg到另一个文件夹下，以便复用构造VOC目录结构的脚本
-    # for x in tqdm(all_img_str_files):
-    #     shutil.copy(str(x), "/data/yousixia/images/shujutang_data/shujutang_to_VOC")
-    # for x in tqdm(all_xml_str_files):
-    #     shutil.copy(str(x), "/data/yousixia/images/shujutang_data/shujutang_to_VOC")
+    not_labeled_stem = list(set(all_xml_stem_files) ^ set(all_img_stem_files))
+    all_not_labeled_img_files = [x for x in all_img_files if x.stem in not_labeled_stem]
+    for x in all_not_labeled_img_files:
+        shutil.move(str(x), "/data/yousixia/images/shujutang_data/购买数据/遗漏标注图片")
+
 
     # 核验是否有遗漏的xml和jpg文件
     shujutang_to_VOC_base_path = Path("/data/yousixia/images/shujutang_data/shujutang_to_VOC")
-    # shujutang_to_VOC_all_files = [pathlib_object for pathlib_object in shujutang_to_VOC_base_path.rglob(
-    #     "*") if pathlib_object.suffix in ['.jpg', '.xml']]
-    # all_xml_files_str = [x.stem + x.suffix for x in all_xml_files]
-    # all_img_files_str = [x.stem + x.suffix for x in all_img_files]
-    # all_files_str = all_xml_files_str + all_img_files_str
-    # shujutang_to_VOC_all_files_stem = [x.stem + x.suffix for x in shujutang_to_VOC_all_files]
-    # print(list(set(all_files_str) ^ set(shujutang_to_VOC_all_files_stem)))
+    shujutang_to_VOC_all_files = [pathlib_object for pathlib_object in shujutang_to_VOC_base_path.rglob(
+        "*") if pathlib_object.suffix in ['.jpg', '.xml']]
+    all_xml_files = [x for x in shujutang_to_VOC_all_files if x.suffix == '.xml']
+    all_img_files = [x for x in shujutang_to_VOC_all_files if (x.suffix in ['.png', '.jpg']) and (
+        '门槛' not in x.stem and '门-门框' not in x.stem and '门' not in x.stem)]
+    all_xml_files_filename = [x.stem + x.suffix for x in all_xml_files]
+    all_img_files_filename = [x.stem + x.suffix for x in all_img_files]
+    all_xml_files_stem = [x.stem for x in all_xml_files]
+    all_img_files_stem = [x.stem for x in all_img_files]
+    all_xml_files_str = [str(x) for x in all_xml_files]
+    all_img_files_str = [str(x) for x in all_img_files]
+    print(list(set(all_xml_files_stem) ^ set(all_img_files_stem)))
+    all_files_str = all_xml_files_filename + all_img_files_filename
+    shujutang_to_VOC_all_files_stem = [x.stem + x.suffix for x in shujutang_to_VOC_all_files]
+    print(list(set(all_files_str) ^ set(shujutang_to_VOC_all_files_stem)))
+
+
+    # 复制所有已标注xml和jpg到另一个文件夹下，以便复用构造VOC目录结构的脚本
+    def data_copy_to_new_folder(filepaths, folder):
+        for x in tqdm(filepaths):
+            shutil.copy(str(x), folder)
+
+    # img_p = Process(target=data_copy_to_new_folder, args=(
+    #     all_img_str_files, str(shujutang_to_VOC_base_path), ))
+    # xml_p = Process(target=data_copy_to_new_folder, args=(
+    #     all_xml_str_files, str(shujutang_to_VOC_base_path), ))
+    # img_p.start()
+    # xml_p.start()
+    # img_p.join()
+    # xml_p.join()
+
+
+    # 输出xml中图片尺寸和图片实际尺寸不符的图片和xml文件
+    # shape_not_right_folder = "/data/yousixia/images/shujutang_data/shape_not_right_data"
+    # shape_not_right_xml = []
+    # shape_not_right_img = []
+    # if os.path.exists(shape_not_right_folder):
+    #     shutil.rmtree(shape_not_right_folder)
+    # os.makedirs(shape_not_right_folder)
+    # all_xml_files_str = sorted(all_xml_files_str)
+    # all_img_files_str = sorted(all_img_files_str)
+    # print(list(set(all_xml_files_stem) ^ set(all_img_files_stem)))
+    # no_object_in_img = list(set(all_xml_files_stem) ^ set(all_img_files_stem))
+
+    # for i in tqdm(range(len(all_xml_files_str))):
+    #     assert Path(all_xml_files_str[i]).stem == Path(all_img_files_str[i]).stem
+    #     tree = ET.parse(all_xml_files_str[i])
+    #     root = tree.getroot()
+    #     for size in root.iter('size'):
+    #         xml_shape = (int(size.find('width').text), int(size.find('height').text))
+    #     # img = cv2.imread(str(img_file))
+    #     img = magic.from_file(str(all_img_files_str[i]))
+    #     # img_shape = (img.shape[1], img.shape[0])
+    #     img_shape_tuple = re.search('(\d+)x(\d+)', img).groups()
+    #     img_shape = tuple([int(x) for x in img_shape_tuple])
+    #     if xml_shape != img_shape:
+    #         shape_not_right_xml.append(str(all_xml_files_str[i]))
+    #         shape_not_right_img.append(str(all_img_files_str[i]))
+    #         shutil.copy(str(all_xml_files_str[i]), shape_not_right_folder)
+    #         shutil.copy(str(all_img_files_str[i]), shape_not_right_folder)
+
 
     # 抽取0.5%的图片用于val
     all_train_val_img_filepaths = [str(pathlib_object) for pathlib_object in shujutang_to_VOC_base_path.rglob(
@@ -183,15 +221,21 @@ if __name__ == '__main__':
     # dataset.to_csv("shujutang_VOC_img_filepath.csv", sep='\t', encoding='utf-8')
 
     set(dataset['class'])
+    include_classes = list('污渍', '宠物粪便', '鞋子', '袜-布', '袜子', '鞋', 'IMG', '地垫', '垃圾桶', '纸团', '风扇底座')
     class_list = list(dataset['class'])
     class_count = {}
     for class1 in tqdm(class_list):
-        if class1 not in class_count:
-            class_count[class1] = 1
-        else:
-            class_count[class1] += 1
+        if class1 in include_classes:
+            if class1 not in class_count:
+                class_count[class1] = 1
+            else:
+                class_count[class1] += 1
     class_random_sample_dict = class_count.copy()
     for k, v in class_count.items():
+        if k == "IMG":
+            # IMG开头代表数据线
+            class_random_sample_dict[k] = v
+            continue
         class_random_sample_dict[k] = round(v * 0.01)
 
     samples_for_val = []
@@ -202,23 +246,66 @@ if __name__ == '__main__':
         samples_for_val += random.sample(this_class_sample_list, sample_num)
 
     # 使用国家项目的数据线数据集加进去
-    teacher_chi_data_base_path = Path("/data/yousixia/images/indoor_new_20220228")
-    all_train_val_img_filepaths = [str(pathlib_object) for pathlib_object in teacher_chi_data_base_path.rglob(
-        "*")]
-    wire_datapaths = []
-    for filepath in all_train_val_img_filepaths:
-        if 'xml' in filepath and 'wire' in get_name_from_xml(filepath):
-            filepath = filepath.replace("xml", "jpg")
-            wire_datapaths.append(filepath)
-    # 随机取20张
-    samples_for_val += random.sample(wire_datapaths, 20)
+    # teacher_chi_data_base_path = Path("/data/yousixia/images/indoor_new_20220228")
+    # all_train_val_img_filepaths = [str(pathlib_object) for pathlib_object in teacher_chi_data_base_path.rglob(
+    #     "*")]
+    # wire_datapaths = []
+    # for filepath in all_train_val_img_filepaths:
+    #     if 'xml' in filepath and 'wire' in get_name_from_xml(filepath):
+    #         filepath = filepath.replace("xml", "jpg")
+    #         wire_datapaths.append(filepath)
+    # # 随机取20张
+    # samples_for_val += random.sample(wire_datapaths, 20)
 
-
+    # 第一列的中文是{'袜子', '垃圾桶', '纸团', '风扇底座', '鞋', '污渍', '鞋子', '宠物粪便', '地垫', '体重秤', '袜-布'}
+    samples_for_val_filenames = pd.DataFrame(samples_for_val)[0].str.rsplit("/", n=1, expand=True)[1]
+    chinese_in_first_col_to_set = set([x for x in samples_for_val_filenames.str.split('\_', expand=True)[0] if '.jpg' not in x])
+    print(chinese_in_first_col_to_set)
+    # 第二列的中文是污渍-({'酱油或醋', '咖啡', '牛奶', '粥', '茶'})
+    chinese_in_second_col_to_set = set([x for x in samples_for_val_filenames.str.split(
+        '\_', expand=True)[1] if x is not None and 'house' not in x and '.jpg' not in x])
+    print(chinese_in_second_col_to_set)
+    # flavor
+    replece_chinese_dict = {
+        '袜子': 'socks',
+        '垃圾桶': 'trashcan',
+        '纸团': 'paper',
+        '风扇底座': 'fanbase',
+        '污渍': {
+            '茶':'tea',
+            '牛奶':'milk',
+            '咖啡':'coffee',
+            '酱油或醋':'flavor',
+            '粥':'congee',
+        },
+        '鞋子': 'shoes',
+        '子': '',
+        '鞋': 'shoes',
+        '宠物粪便': 'feces',
+        '地垫': 'carpet',
+        '体重秤': 'scale',
+        '袜-布': 'clothes'
+    }
 
     for filepath in tqdm(samples_for_val):
-        shutil.copy(filepath, "/data/yousixia/images/shujutang_data/shujutang_for_quanzhi_val")
+        english_name = ''
+        # 将文件名中出现的中文改为英文
+        old_name = Path(filepath).stem + Path(filepath).suffix
+        for key in replece_chinese_dict:
+            if key in old_name:
+                if '污渍' in old_name:
+                    for key1 in replece_chinese_dict['污渍']:
+                        if key1 in old_name:
+                            english_name = old_name.replace('污渍_' + key1, replece_chinese_dict['污渍'][key1])
+                            break
+                    break
+                english_name = old_name.replace(key, replece_chinese_dict[key])
+                break
+        shutil.copy(filepath, "/data/yousixia/images/shujutang_data/shujutang_for_quanzhi_val/" + english_name)
         filepath = filepath.replace("jpg", "xml")
-        shutil.copy(filepath, "/data/yousixia/images/shujutang_data/shujutang_for_quanzhi_val")
+        english_name = english_name.replace("jpg", "xml")
+        shutil.copy(filepath, "/data/yousixia/images/shujutang_data/shujutang_for_quanzhi_val/" + english_name)
+
 
 
 

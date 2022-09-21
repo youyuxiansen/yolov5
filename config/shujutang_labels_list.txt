@@ -1,0 +1,9 @@
+shoes
+trashcan
+clothes
+carpet
+paper
+feces
+data_wire
+fanbase
+stains

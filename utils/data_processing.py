@@ -86,7 +86,7 @@ if __name__ == '__main__':
                              'Multiple folder names, separated by commas。（e.q. labelme_20210520,labelme）')
     parser.add_argument('--target-folder-path', "-p", type=str,
                         help='Specifying forder names saving processed training data, '
-                             'it should locates under "/home/yousixia/data/VOCs"（e.q. /home/yousixia/data/VOCs/VOC2007_amicro）')
+                             'it should locates under "/home/yousixia/data/VOCs"（e.q. /data/yousixia/VOCs/VOC2007_amicro）')
     parser.add_argument('--has-hard-sample', "-hard", default=True, action='store_false',
                         help="Include the images in folder which don't have correlated xml files")
     # parser.add_argument('--label-path', nargs='+', type=str, help='Directory containing xml labels')

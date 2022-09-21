@@ -1,8 +1,9 @@
 from collections import Counter
 import os
 import argparse
+from tqdm import tqdm
 import xml.etree.ElementTree as ET
-from config.cls_name_replacement_config import replace_relation
+from config.cls_name_replacement_config import replace_relation, shujut_relation
 
 
 def get_name_from_xml(xml_file: str) -> list:
@@ -24,7 +25,7 @@ def replace_cls_name_xml(xml_file: str) -> None:
 			# print(obj.find('name').text, '\n', xml_file)
 			if opt.replace_clsname:
 				obj.find('name').text = obj.find('name').text.replace(
-					obj.find('name').text, replace_relation[obj.find('name').text])
+					obj.find('name').text, shujut_relation[obj.find('name').text])
 		except (AttributeError, KeyError):
 			pass
 		tree.write(xml_file, encoding='utf-8')
@@ -36,7 +37,7 @@ if __name__ == '__main__':
 	# parser.add_argument('--image-dir', '-i', type=str, help='Directory containing images')
 	parser.add_argument('--print-cls', '-pc', action='store_false',
 	                    help='Print unique class names')
-	parser.add_argument('--replace-clsname', '-r', action='store_false',
+	parser.add_argument('--replace-clsname', '-r', action='store_true',
 	                    help='Specify config file for replacing class name in annatation')
 	# TODO: needs support coco json files
 	# parser.add_argument('--annatation_type', type=str, help='xml means VOC;json means coco')
@@ -46,16 +47,20 @@ if __name__ == '__main__':
 
 	if opt.print_cls:
 		allcls_list = []
+		object_greater_than_2 = []
 		allcls_with_imagenames = {}
-		for xml in xml_files:
+		for xml in tqdm(xml_files):
 			cls_list = get_name_from_xml(os.path.join(opt.annatation_dir, xml))
+			if len(set(cls_list)) > 1:
+				object_greater_than_2.append(os.path.join(opt.annatation_dir, xml))
 			allcls_list += cls_list
 
 		print(set(allcls_list), '\n')
 		print(Counter(allcls_list), '\n')
+		# print(object_greater_than_2, '\n')
 
-
-	for xml in xml_files:
-		replace_cls_name_xml(os.path.join(opt.annatation_dir, xml))
+	if opt.replace_clsname:
+		for xml in tqdm(xml_files):
+			replace_cls_name_xml(os.path.join(opt.annatation_dir, xml))
 
 

@@ -249,3 +249,14 @@ com_crashlytics_export_strings.xml
 crashlytics.properties
 crashlytics-build.properties
 fabric.properties
+
+# amicro_files
+amicro_files/test_quanzhi_AIboard/evaluate_code/ffmpeg-master-latest-win64-gpl-shared/
+ffmpeg-master-latest-win64-gpl-shared.zip
+amicro_files/test_quanzhi_AIboard/dataset_for_val/detection-results
+amicro_files/test_quanzhi_AIboard/dataset_for_val/ground-truth
+shujutang_VOC_img_filepath*
+pic.zip
+recoginfo.txt
+amicro_files/test_quanzhi_AIboard/dataset_for_val/mAP/input
+amicro_files/test_quanzhi_AIboard/dataset_for_val/mAP/output

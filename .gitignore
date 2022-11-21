@@ -25,7 +25,11 @@
 
 storage.googleapis.com
 runs/*
-!data/hyps/*
+data/images/*
+!data/*.yaml
+!data/hyps
+!data/scripts
+!data/images
 !data/images/zidane.jpg
 !data/images/bus.jpg
 !data/*.sh
@@ -54,6 +58,7 @@ VOC/
 *.h5
 *_saved_model/
 *_web_model/
+*_openvino_model/
 darknet53.conv.74
 yolov3-tiny.conv.15
 *.rknn
@@ -249,6 +254,12 @@ com_crashlytics_export_strings.xml
 crashlytics.properties
 crashlytics-build.properties
 fabric.properties
+
+# some own ignored files
+data/hyps/hyp_evolved50_indoor.yaml
+data/hyps/hyp.finetune.amicro.robottracking.yaml
+data/robot_tracking.yaml
+data/indoor_amicro.yaml
 
 # amicro_files
 amicro_files/test_quanzhi_AIboard/evaluate_code/ffmpeg-master-latest-win64-gpl-shared/

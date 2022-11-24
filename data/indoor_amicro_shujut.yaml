@@ -1,12 +1,12 @@
 download: bash data/scripts/get_voc_shujut_indoor_detect.sh
 
 # train and val data as 1) directory: path/images/, 2) file: path/images.txt, or 3) list: [path1/images/, path2/images/]
-train: /data/yousixia/YOLOs/shujutang_for_quanzhi_val/VOC/images/train/
-val: /data/yousixia/YOLOs/shujutang_for_quanzhi_val/VOC/images/val/
+train: /home/yousixia/data/YOLOs/shujutang_to_VOC_resized/VOC/images/train/
+val: /home/yousixia/data/YOLOs/shujutang_to_VOC_resized/VOC/images/val/
 
 # number of classes
-nc: 11
+nc: 10
 
 # class names
-names: ["wire", "shoes", "trashcan", "carpet", "clothes",
-           "feces", "scale", "socks", "stains", "fanbase", "paper"]
+names: ["data_wire", "shoes", "trashcan", "carpet", "clothes",
+           "feces", "scale", "stains", "fanbase", "paper"]

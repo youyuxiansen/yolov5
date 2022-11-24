@@ -271,3 +271,6 @@ pic.zip
 recoginfo.txt
 amicro_files/test_quanzhi_AIboard/dataset_for_val/mAP/input
 amicro_files/test_quanzhi_AIboard/dataset_for_val/mAP/output
+utils/data_exploration
+data
+amicro_files

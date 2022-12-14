@@ -1,18 +1,14 @@
 import os
-from collections import Counter
 from glob import glob
 import random
 import shutil
 from pathlib import Path
-import platform
-import threading
 from multiprocessing import Process
 import xml.etree.ElementTree as ET
-import time
 from tqdm import tqdm
 import cv2
 from math import floor
-import re
+from PIL import Image
 
 import argparse
 import pandas as pd
@@ -202,12 +198,21 @@ if __name__ == '__main__':
     opt = parser.parse_args()
     opt.data_root = Path(opt.data_root).as_posix()
 
+    global all_xml_files
+    global all_img_files
     base_path = Path(opt.data_root)
     all_files = [pathlib_object for pathlib_object in base_path.rglob(
         "*") if pathlib_object.suffix in ['.jpg', '.png', '.xml']]
     all_xml_files = [x for x in all_files if x.suffix == '.xml']
     all_img_files = [x for x in all_files if (x.suffix in ['.png', '.jpg']) and (
         '门槛' not in x.stem and '门-门框' not in x.stem and '门' not in x.stem)]
+
+    global all_xml_stem_files
+    global all_img_stem_files
+    global all_xml_str_files
+    global all_img_str_files
+    global all_xml_files_str
+    global all_img_files_str
 
     all_xml_stem_files = [x.stem for x in all_xml_files]
     all_img_stem_files = [x.stem for x in all_img_files]
@@ -239,27 +244,33 @@ if __name__ == '__main__':
         img_p.join()
         xml_p.join()
 
-    shujutang_to_VOC_base_path = Path("/data/yousixia/images/shujutang_data/shujutang_to_VOC")
+    shujutang_to_VOC_base_path = Path("/data/yousixia/images/shujutang_data/wire_to_VOC")
+    shujutang_to_VOC_all_files = [pathlib_object for pathlib_object in shujutang_to_VOC_base_path.rglob(
+        "*") if pathlib_object.suffix in ['.jpg', '.xml']]
+    all_xml_files = [x for x in shujutang_to_VOC_all_files if x.suffix == '.xml']
+    all_img_files = [x for x in shujutang_to_VOC_all_files if (x.suffix in ['.png', '.jpg']) and (
+        '门槛' not in x.stem and '门-门框' not in x.stem and '门' not in x.stem)]
+    all_img_stem_files = [x.stem for x in all_xml_files]
+    all_img_filesall_img_files_str_stem = [x.stem for x in all_img_files]
+    all_xml_files_str = [str(x) for x in all_xml_files]
+    all_img_files_str = [str(x) for x in all_img_files]
+
     def get_label_missed_sample():
         # 移动遗漏标注的图片到另一个文件夹
-        not_labeled_stem = list(set(all_xml_stem_files) ^ set(all_img_stem_files))
-        all_not_labeled_img_files = [x for x in all_img_files if x.stem in not_labeled_stem]
+        image_missing_stem = list(set(all_xml_stem_files).difference(set(all_img_stem_files)))
+        xml_missing_stem = list(set(all_img_stem_files).difference(set(all_xml_stem_files)))
+        global all_img_files
+        global all_xml_files
+        global all_xml_files_str
+        all_not_labeled_img_files = [x for x in all_img_files if x.stem in image_missing_stem]
         for x in all_not_labeled_img_files:
-            shutil.move(str(x), "/data/yousixia/images/shujutang_data/购买数据/遗漏标注图片")
+            shutil.move(str(x), "/data/yousixia/images/shujutang_data/遗漏标注图片")
 
         # 核验是否有遗漏的xml和jpg文件
-        shujutang_to_VOC_all_files = [pathlib_object for pathlib_object in shujutang_to_VOC_base_path.rglob(
-            "*") if pathlib_object.suffix in ['.jpg', '.xml']]
-        all_xml_files = [x for x in shujutang_to_VOC_all_files if x.suffix == '.xml']
-        all_img_files = [x for x in shujutang_to_VOC_all_files if (x.suffix in ['.png', '.jpg']) and (
-            '门槛' not in x.stem and '门-门框' not in x.stem and '门' not in x.stem)]
         all_xml_files_filename = [x.stem + x.suffix for x in all_xml_files]
         all_img_files_filename = [x.stem + x.suffix for x in all_img_files]
-        all_xml_files_stem = [x.stem for x in all_xml_files]
-        all_img_files_stem = [x.stem for x in all_img_files]
-        all_xml_files_str = [str(x) for x in all_xml_files]
-        all_img_files_str = [str(x) for x in all_img_files]
-        print(list(set(all_xml_files_stem) ^ set(all_img_files_stem)))
+
+        print(list(set(all_img_stem_files) ^ set(all_img_stem_files)))
         all_files_str = all_xml_files_filename + all_img_files_filename
         shujutang_to_VOC_all_files_stem = [x.stem + x.suffix for x in shujutang_to_VOC_all_files]
         print(list(set(all_files_str) ^ set(shujutang_to_VOC_all_files_stem)))
@@ -284,25 +295,45 @@ if __name__ == '__main__':
         shape_not_right_folder = "/data/yousixia/images/shujutang_data/shape_not_right_data"
         shape_not_right_xml = []
         shape_not_right_img = []
+        global all_img_stem_files
+        global all_img_stem_files
+        global all_xml_files_str
+        global all_img_files_str
         if os.path.exists(shape_not_right_folder):
             shutil.rmtree(shape_not_right_folder)
         os.makedirs(shape_not_right_folder)
         all_xml_files_str = sorted(all_xml_files_str)
         all_img_files_str = sorted(all_img_files_str)
-        print(list(set(all_xml_files_stem) ^ set(all_img_files_stem)))
-        no_object_in_img = list(set(all_xml_files_stem) ^ set(all_img_files_stem))
+        print(list(set(all_img_stem_files) ^ set(all_img_stem_files)))
+        no_object_in_img = list(set(all_img_stem_files) ^ set(all_img_stem_files))
 
+        img_increment_id = 0
+        original_img_folder = "/data/yousixia/images/shujutang_data/购买数据/数据线22077张/数据线22077张"
         for i in tqdm(range(len(all_xml_files_str))):
-            assert Path(all_xml_files_str[i]).stem == Path(all_img_files_str[i]).stem
+            while Path(all_xml_files_str[i]).stem != Path(all_img_files_str[i + img_increment_id]).stem:
+                print("{} different with {}".format(all_xml_files_str[i], Path(all_img_files_str[i + img_increment_id])))
+                shutil.copy(Path(original_img_folder) / (Path(all_img_files_str[i + img_increment_id]).stem + Path(all_img_files_str[i + img_increment_id]).suffix), str(Path(all_img_files_str[i + img_increment_id]).parent))
+                img_increment_id += 1
             tree = ET.parse(all_xml_files_str[i])
             root = tree.getroot()
             for size in root.iter('size'):
                 xml_shape = (int(size.find('width').text), int(size.find('height').text))
-            img = cv2.imread(str(all_img_files_str[i]))
+            # img = cv2.imread(str(all_img_files_str[i]))
+
+            img_found = 0
+            while not img_found:
+                try:
+                    with Image.open(str(all_img_files_str[i])) as img:
+                        img_shape = img.size
+                        img_found = 1
+                except:
+                    print("{} is Broken".format(Path(all_img_files_str[i]).stem))
+                    img_found = 0
+                    shutil.copy(Path(original_img_folder) / (Path(all_img_files_str[i]).stem + Path(all_img_files_str[i]).suffix), str(Path(all_img_files_str[i]).parent))
             # img = magic.from_file(str(all_img_files_str[i]))
             # img_shape = (img.shape[1], img.shape[0])
-            img_shape_tuple = re.search('(\d+)x(\d+)', img).groups()
-            img_shape = tuple([int(x) for x in img_shape_tuple])
+            # img_shape_tuple = re.search('(\d+)x(\d+)', img).groups()
+            # img_shape = tuple([int(x) for x in img_shape_tuple])
             if xml_shape != img_shape:
                 shape_not_right_xml.append(str(all_xml_files_str[i]))
                 shape_not_right_img.append(str(all_img_files_str[i]))
@@ -317,6 +348,10 @@ if __name__ == '__main__':
             with Pool(processes=n_processors) as pool:
                 return pool.map(func, tqdm(i))
         n_processors = 20
+        resized_dir = "/data/yousixia/images/shujutang_data/wire_to_VOC_resized/"
+        if os.path.exists(resized_dir):
+            shutil.rmtree(resized_dir)
+        os.makedirs(resized_dir)
         x_ls = all_img_str_files
         base_path_for_mp = [str(shujutang_to_VOC_base_path)] * len(all_img_str_files)
         out = run_multiprocessing(do_resize_with_concurrent, x_ls, n_processors)
@@ -444,6 +479,6 @@ if __name__ == '__main__':
     # get_repeat_file()
     # get_label_missed_sample()
     # move_to_VOC()
-    # get_size_unmatched_img_and_xml()
+    get_size_unmatched_img_and_xml()
     resize_all_img_and_xml()
     # extract_some_to_do_val()

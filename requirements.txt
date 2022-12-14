@@ -49,3 +49,4 @@ seaborn>=0.11.0
 # ultralytics  # HUB https://hub.ultralytics.com
 thop  # FLOPs computation
 openmim
+scikit-learn

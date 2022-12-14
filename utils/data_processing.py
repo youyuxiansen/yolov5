@@ -30,11 +30,13 @@ def construct_amicro_img_dir(saved_path, labelme_path, has_hard_sample: bool):
         for xml_file in tqdm(xml_files):
             shutil.copy(xml_file, saved_path / "Annotations/")
         xml_files = path.glob("*.xml")
-        xml_stem_list = [xml.stem for xml in list(xml_files)]
+        xml_stem_list = [Path(x).stem for x in xml_files]
+        img_stem_list = [x.stem for x in list(image_files)]
+        xml_missing_list = list(set(img_stem_list).difference(set(xml_stem_list)))
         for image in tqdm(image_files):
             if not has_hard_sample:
                 # check if pic has a xml correlate to it.
-                if image.stem in xml_stem_list:
+                if image.stem not in xml_missing_list:
                     shutil.copy(image, saved_path / "JPEGImages/")
             else:
                 shutil.copy(image, saved_path / "JPEGImages/")
@@ -49,10 +51,12 @@ def construct_amicro_img_dir(saved_path, labelme_path, has_hard_sample: bool):
     ftrain = open((txtsavepath / 'train.txt'), 'w')
     fval = open((txtsavepath / 'val.txt'), 'w')
     trainval_files = glob(os.path.join(saved_path, "Annotations/*.xml"))
-    trainval_files = [i.split("/")[-1].split(".xml")[0] for i in trainval_files]
+    trainval_files = [i.split("/")[-1].split(".xml")[0] for i in tqdm(trainval_files)]
     total_files = os.listdir(saved_path / "JPEGImages")
-    test_files = [x for x in total_files if x not in trainval_files]
-    test_files = [i.split("/")[-1].split(".jpg")[0] for i in test_files]
+    total_files = sorted(total_files)
+    trainval_files = sorted(trainval_files)
+    total_files = [Path(x).stem for x in total_files]
+    test_files = list(set(total_files).difference(set(trainval_files)))
     for file in tqdm(trainval_files):
         ftrainval.write(file + "\n")
     # test

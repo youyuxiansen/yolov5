@@ -4,10 +4,14 @@ import argparse
 import shutil
 from tqdm import tqdm
 import xml.etree.ElementTree as ET
-from config.cls_name_replacement_config import replace_relation, shujut_relation
 from pathlib import Path
 from typing import List
 from support_img_type import support_img_type
+
+import os,sys
+sys.path.insert(0,os.getcwd())
+
+from config.cls_name_replacement_config import replace_relation, shujut_relation
 
 
 def get_name_from_xml(xml_file: str) -> list:

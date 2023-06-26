@@ -348,6 +348,8 @@ class DetectMultiBackend(nn.Module):
         suffixes = ['.pt', '.torchscript', '.onnx', '.engine', '.tflite', '.pb', '', '.mlmodel', '.rknn']
         check_suffix(w, suffixes)  # check weights have acceptable suffix
         pt, jit, onnx, engine, tflite, pb, saved_model, coreml, self.rknn = (suffix == x for x in suffixes)  # backend booleans
+        fp16 &= pt or jit or onnx or engine  # FP16
+        nhwc = coreml or saved_model or pb or tflite or edgetpu  # BHWC formats (vs torch BCWH)
         stride, names = 64, [f'class{i}' for i in range(1000)]  # assign defaults
         if inference_type == 'rknn':  # force to go to the rknn branch
             from rknn_lib.rknn_python_inference.rknn_impl import RknnImpl

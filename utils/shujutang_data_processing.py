@@ -1,3 +1,4 @@
+from enum import Enum
 import os
 from glob import glob
 import random
@@ -244,7 +245,7 @@ if __name__ == '__main__':
         img_p.join()
         xml_p.join()
 
-    shujutang_to_VOC_base_path = Path("/data/yousixia/images/shujutang_data/wire_to_VOC")
+    shujutang_to_VOC_base_path = Path("/data/yousixia/images/shujutang_data/shujutang_to_VOC_resized")
     shujutang_to_VOC_all_files = [pathlib_object for pathlib_object in shujutang_to_VOC_base_path.rglob(
         "*") if pathlib_object.suffix in ['.jpg', '.xml']]
     all_xml_files = [x for x in shujutang_to_VOC_all_files if x.suffix == '.xml']
@@ -368,12 +369,25 @@ if __name__ == '__main__':
         #     for group in grouper(all_img_str_files, 30000)]
         # concurrent.futures.wait(futures)
 
-    def extract_some_to_do_val():
+    class SAMPLE_TYPE(Enum):
+        NUM = 0
+        PERCENTAGE = 1
+
+    def extract_some(output_dir_name, acquired_num = 0.5 / 100, sample_type = SAMPLE_TYPE.PERCENTAGE):
+        def get_class_sample_num(total_count):
+            if sample_type == SAMPLE_TYPE.PERCENTAGE:
+                return round(total_count * acquired_num)
+            elif sample_type == SAMPLE_TYPE.NUM:
+                return acquired_num
+            else:
+                raise TypeError("sample_type not support!")
+
         # 抽取0.5%的图片用于val
         all_train_val_img_filepaths = [str(pathlib_object) for pathlib_object in shujutang_to_VOC_base_path.rglob(
             "*") if pathlib_object.suffix in ['.jpg']]
 
-        if not os.path.exists("shujutang_VOC_img_filepath.txt"):
+        if os.path.exists("shujutang_VOC_img_filepath.txt"):
+            os.remove("shujutang_VOC_img_filepath.txt")
             f = open("shujutang_VOC_img_filepath.txt", "w")
             for i, x in enumerate(tqdm(all_train_val_img_filepaths)):
                 f.write(x + '\n')
@@ -384,12 +398,12 @@ if __name__ == '__main__':
         # split by the last '/'
         dataset = pd.concat([dataset, dataset[0].str.rsplit("/", n=1, expand=True)[1]], axis=1)
         dataset = pd.concat([dataset, dataset[1].str.split('\_|\.', expand=True)], axis=1)
-        dataset.columns = ["path", "filename", "class", "house_no", "ID", "suffix"]
+        dataset.columns = ["path", "filename", "class", "house_no", "ID", "suffix", ""]
         # dataset = dataset.sort_values(['class', 'house_no'], ascending=[True, True])
         # dataset.to_csv("shujutang_VOC_img_filepath.csv", sep='\t', encoding='utf-8')
 
         set(dataset['class'])
-        include_classes = list('污渍', '宠物粪便', '鞋子', '袜-布', '袜子', '鞋', 'IMG', '地垫', '垃圾桶', '纸团', '风扇底座')
+        include_classes = list(['污渍', '宠物粪便', '鞋子', '袜-布', '袜子', '鞋', 'IMG', '地垫', '垃圾桶', '纸团', '风扇底座'])
         class_list = list(dataset['class'])
         class_count = {}
         for class1 in tqdm(class_list):
@@ -404,7 +418,9 @@ if __name__ == '__main__':
                 # IMG开头代表数据线
                 class_random_sample_dict[k] = v
                 continue
-            class_random_sample_dict[k] = round(v * 0.01)
+            getted_sample_num = get_class_sample_num(v)
+            class_random_sample_dict[k] = class_random_sample_dict[k] if (class_random_sample_dict[k] < getted_sample_num) else getted_sample_num
+            print("class {} sample_nums = {}".format(k, class_random_sample_dict[k]))
 
         samples_for_val = []
         for k in class_random_sample_dict:
@@ -470,15 +486,15 @@ if __name__ == '__main__':
                         break
                     english_name = old_name.replace(key, replece_chinese_dict[key])
                     break
-            shutil.copy(filepath, "/data/yousixia/images/shujutang_data/shujutang_for_quanzhi_val/" + english_name)
+            shutil.copy(filepath, os.path.join("/data/yousixia/images/shujutang_data/", output_dir_name, english_name))
             filepath = filepath.replace("jpg", "xml")
             english_name = english_name.replace("jpg", "xml")
-            shutil.copy(filepath, "/data/yousixia/images/shujutang_data/shujutang_for_quanzhi_val/" + english_name)
+            shutil.copy(filepath, os.path.join("/data/yousixia/images/shujutang_data/", output_dir_name, english_name))
 
 
     # get_repeat_file()
     # get_label_missed_sample()
     # move_to_VOC()
-    get_size_unmatched_img_and_xml()
-    resize_all_img_and_xml()
-    # extract_some_to_do_val()
+    # get_size_unmatched_img_and_xml()
+    # resize_all_img_and_xml()
+    extract_some("to_yizhi", 5000, SAMPLE_TYPE.NUM)

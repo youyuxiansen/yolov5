@@ -38,7 +38,7 @@ except ImportError:
 class Detect(nn.Module):
     # YOLOv5 Detect head for detection models
     stride = None  # strides computed during build
-    onnx_dynamic = False  # force grid reconstruction
+    dynamic = False  # force grid reconstruction
     export = False  # export mode
     rknn_export = False  # rknn export
 

@@ -2,7 +2,6 @@
 # python train.py --batch 64 --weights yolov5m.pt --data voc.yaml --img 512 --epochs 50
 # See tutorials for hyperparameter evolution https://github.com/ultralytics/yolov5#tutorials
 
-
 # Hyperparameter Evolution Results
 # Generations: 306
 #                   P         R     mAP.5 mAP.5:.95       box       obj       cls

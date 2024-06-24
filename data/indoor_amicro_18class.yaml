@@ -8,6 +8,24 @@ val: /data/yousixia/YOLOs/indoor_detecting_18class/VOC/images/val/
 nc: 18
 
 # class names
-names: [ "trashcan", "slippers", "wire", "socks", "carpet", "book",
-        "feces", "curtain", "stool", "bed", "sofa", "closetool", "table",
-        "cabinet", "ajardoor", "opendoor", "closedoor", "stairway" ]
+names:
+  [
+    "trashcan",
+    "slippers",
+    "wire",
+    "socks",
+    "carpet",
+    "book",
+    "feces",
+    "curtain",
+    "stool",
+    "bed",
+    "sofa",
+    "closetool",
+    "table",
+    "cabinet",
+    "ajardoor",
+    "opendoor",
+    "closedoor",
+    "stairway",
+  ]
